@@ -37,11 +37,22 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["turn_id", "role", "content"],
+        "required": ["turn_id", "content"],
         "properties": {
           "turn_id": { "type": "string", "minLength": 1 },
           "role": { "type": "string", "enum": ["user", "assistant", "system"] },
+          "speaker": { "type": "string", "enum": ["user", "assistant"] },
           "content": { "type": "string" },
+          "tool_call": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tool_name"],
+            "properties": {
+              "tool_name": { "type": "string", "minLength": 1 },
+              "arguments": { "type": "object" },
+              "result": {}
+            }
+          },
           "tool_calls": {
             "type": "array",
             "items": {
@@ -55,7 +66,11 @@
               }
             }
           }
-        }
+        },
+        "anyOf": [
+          { "required": ["speaker"] },
+          { "required": ["role"] }
+        ]
       }
     }
   }

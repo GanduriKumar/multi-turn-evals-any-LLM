@@ -24,3 +24,7 @@ expectations:
         - type: score
           operator: ">="
           threshold: 0.8
+final_outcome:
+  success: true
+  must_include: ["25 days", "policy"]
+  must_not_include: ["unlimited"]

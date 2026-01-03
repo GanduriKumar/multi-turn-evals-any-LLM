@@ -4,7 +4,7 @@
   "title": "Golden Expected Responses",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "conversation_id", "expectations"],
+  "required": ["version", "expectations"],
   "properties": {
     "version": {
       "type": "string",
@@ -20,6 +20,7 @@
         "additionalProperties": false,
         "required": ["turn_id", "expected"],
         "properties": {
+          "conversation_id": { "type": "string", "minLength": 1 },
           "turn_id": { "type": "string", "minLength": 1 },
           "expected": {
             "type": "object",
@@ -71,6 +72,41 @@
           }
         }
       }
+    },
+    "final_outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "conversation_id": { "type": "string", "minLength": 1 },
+        "success": { "type": "boolean" },
+        "must_include": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "must_not_include": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "metadata": { "type": "object" }
+      }
     }
   }
+  ,
+  "allOf": [
+    {
+      "if": { "not": { "required": ["conversation_id"] } },
+      "then": {
+        "properties": {
+          "expectations": {
+            "items": {
+              "required": ["conversation_id"]
+            }
+          },
+          "final_outcome": {
+            "required": ["conversation_id"]
+          }
+        }
+      }
+    }
+  ]
 }

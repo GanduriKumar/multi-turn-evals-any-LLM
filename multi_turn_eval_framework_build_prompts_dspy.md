@@ -208,7 +208,7 @@ Write tests (backend/tests/test_versioning.py) that parse various semantic versi
 
 Test that missing or malformed version fields in datasets cause validation errors.
 
-# [ ] Prompt012 — Implement tagging for dataset domain and difficulty
+# [x] Prompt012 — Implement tagging for dataset domain and difficulty
 
 Prompt:
 
@@ -224,7 +224,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_filtering.py) that filter a list of dataset metadata by various tag and difficulty combinations and assert that the correct datasets are returned.
 
-# [ ] Prompt013 — Store multi‑turn conversation turns as ordered lists with speaker roles and tool calls
+# [x] Prompt013 — Store multi‑turn conversation turns as ordered lists with speaker roles and tool calls
 
 Prompt:
 
@@ -240,7 +240,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_conversation_model.py) that construct conversations with and without tool calls and verify ordering and data integrity.
 
-# [ ] Prompt014 — Store expected responses separately keyed by conversation and turn IDs
+# [x] Prompt014 — Store expected responses separately keyed by conversation and turn IDs
 
 Prompt:
 
@@ -256,7 +256,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_golden_access.py) that store and retrieve golden entries by ID and verify correctness.
 
-# [ ] Prompt015 — Allow per‑turn expected outputs and optional final outcome expectations
+# [x] Prompt015 — Allow per‑turn expected outputs and optional final outcome expectations
 
 Prompt:
 
@@ -272,7 +272,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_final_outcome.py) that include final outcome expectations and verify that they are evaluated properly.
 
-# [ ] Prompt016 — Support multiple acceptable variants per expected output
+# [x] Prompt016 — Support multiple acceptable variants per expected output
 
 Prompt:
 
