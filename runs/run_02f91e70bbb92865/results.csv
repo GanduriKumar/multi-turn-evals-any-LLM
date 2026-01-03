@@ -1,0 +1,2 @@
+run_id,dataset_id,conversation_id,model_name,conv_score,conv_pass,turn_id,weighted_score,passed,prompt,response,metric_weighted
+run_02f91e70bbb92865,conv001,conv-001,dummy,0.0,False,t2,0.0,False,Summarize our leave policy,DUMMY: [SYSTEM: You are a helpful assistant. | TOOL: doc_search args={'query': 'leave policy'} result={'doc_id': 42}] -> Summarize our leave policy,0.0

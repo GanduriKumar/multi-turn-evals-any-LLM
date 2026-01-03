@@ -836,7 +836,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_audit_logging.py) that run evaluations and verify that audit logs are created with correct entries.
 
-# [ ] Prompt053 — Expose REST API layer for backend capabilities
+# [x] Prompt053 — Expose REST API layer for backend capabilities
 
 Prompt:
 
@@ -852,7 +852,7 @@ Tests to add/run now:
 
 Write API tests (backend/tests/test_api.py) that call each endpoint using httpx and verify correct responses, including error cases.
 
-# [ ] Prompt054 — Implement dataset listing API endpoint
+# [x] Prompt054 — Implement dataset listing API endpoint
 
 Prompt:
 
@@ -866,7 +866,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_datasets.py) that call the endpoint and verify that the response includes expected dataset entries and metadata.
 
-# [ ] Prompt055 — Implement API to fetch conversation and golden data by ID
+# [x] Prompt055 — Implement API to fetch conversation and golden data by ID
 
 Prompt:
 
@@ -880,7 +880,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_conversation.py) that request valid and invalid conversation IDs and assert responses or error messages accordingly.
 
-# [ ] Prompt056 — Implement API to start a new evaluation run
+# [x] Prompt056 — Implement API to start a new evaluation run
 
 Prompt:
 
@@ -894,7 +894,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_start_run.py) that post valid and invalid run configurations and verify correct run creation or errors.
 
-# [ ] Prompt057 — Implement API to poll job progress
+# [x] Prompt057 — Implement API to poll job progress
 
 Prompt:
 
@@ -908,7 +908,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_progress.py) that run evaluations and poll progress, verifying that statuses update over time.
 
-# [ ] Prompt058 — Implement API to retrieve per‑turn outputs and metric breakdowns
+# [x] Prompt058 — Implement API to retrieve per‑turn outputs and metric breakdowns
 
 Prompt:
 
@@ -922,7 +922,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_metrics.py) that run an evaluation and retrieve metric breakdowns, verifying that all data matches stored results.
 
-# [ ] Prompt059 — Implement API to download run artifacts (JSON, CSV, report)
+# [x] Prompt059 — Implement API to download run artifacts (JSON, CSV, report)
 
 Prompt:
 
@@ -936,7 +936,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_artifacts.py) that request each artifact type and verify that the downloaded files match those stored on disk.
 
-# [ ] Prompt060 — Implement API to submit human evaluation feedback
+# [x] Prompt060 — Implement API to submit human evaluation feedback
 
 Prompt:
 
@@ -950,7 +950,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_feedback.py) that submit valid and invalid feedback and verify correct storage or error responses.
 
-# [ ] Prompt061 — Implement API to compare two runs and return regression summaries
+# [x] Prompt061 — Implement API to compare two runs and return regression summaries
 
 Prompt:
 
@@ -964,7 +964,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_api_compare.py) that compare two sample runs and verify that the delta calculations are correct.
 
-# [ ] Prompt062 — Generate OpenAPI/Swagger documentation automatically
+# [x] Prompt062 — Generate OpenAPI/Swagger documentation automatically
 
 Prompt:
 

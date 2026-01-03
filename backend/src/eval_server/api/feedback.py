@@ -8,7 +8,7 @@ import json
 
 from eval_server.utils.audit import log_audit_event
 
-router = APIRouter()
+router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 
 class TurnFeedback(BaseModel):
@@ -77,7 +77,7 @@ def _load_existing(path: Path) -> Dict[str, Any]:
         return {"annotations": []}
 
 
-@router.post("/feedback", response_model=SubmitFeedbackResponse)
+@router.post("/", response_model=SubmitFeedbackResponse)
 def submit_feedback(req: SubmitFeedbackRequest, x_user: str | None = Header(default=None, alias="X-User")) -> SubmitFeedbackResponse:
     """Submit evaluator feedback for a run. Appends to annotations.json in the run directory.
 
