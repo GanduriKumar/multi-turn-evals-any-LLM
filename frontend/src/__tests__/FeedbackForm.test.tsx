@@ -1,13 +1,12 @@
-/// <reference types="jest" />
-import '@testing-library/jest-dom';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import FeedbackForm from '../components/FeedbackForm';
-import { submitFeedback } from '../utils/api';
+import '@testing-library/jest-dom'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { vi, describe, test, expect, beforeEach } from 'vitest'
+import FeedbackForm from '../components/FeedbackForm'
+import { submitFeedback } from '../utils/api'
 
-// Mock the API module
-jest.mock('../utils/api', () => ({
-  submitFeedback: jest.fn(),
-}));
+vi.mock('../utils/api', () => ({
+  submitFeedback: vi.fn(),
+}))
 
 describe('FeedbackForm', () => {
   const defaultProps = {
@@ -19,21 +18,21 @@ describe('FeedbackForm', () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   test('renders all fields correctly', () => {
-    render(<FeedbackForm {...defaultProps} />);
+    render(<FeedbackForm {...defaultProps} />)
     
-    expect(screen.getByLabelText(/Rating/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Notes/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Override Pass/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Override Score/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Submit Feedback/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Rating/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Notes/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Override Pass/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Override Score/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Submit Feedback/i })).toBeInTheDocument()
   });
 
   test('submits form with entered values', async () => {
-    (submitFeedback as jest.Mock).mockResolvedValue({
+    ;(submitFeedback as any).mockResolvedValue({
       run_id: 'run-1',
       stored_path: '/path/to/annotations.json',
       total_records: 1,
@@ -63,20 +62,19 @@ describe('FeedbackForm', () => {
           override_pass: true,
           override_score: 0.9,
         }),
-      ]);
+      ])
     });
 
-    // Verify success message
-    expect(await screen.findByText(/Saved to/i)).toBeInTheDocument();
+    expect(await screen.findByRole('status')).toHaveTextContent(/Saved to/i)
   });
 
   test('handles submission error', async () => {
-    (submitFeedback as jest.Mock).mockRejectedValue(new Error('Network error'));
+    ;(submitFeedback as any).mockRejectedValue(new Error('Network error'))
 
     render(<FeedbackForm {...defaultProps} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Submit Feedback/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Submit Feedback/i }))
 
-    expect(await screen.findByText(/Network error/i)).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Network error/i)
   });
 });
