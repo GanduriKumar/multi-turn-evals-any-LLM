@@ -17,6 +17,8 @@ from .scoring.normalizer import normalize_turn_output
 from .scoring.turn_scoring import score_turn_canonical
 from .scoring.thresholds import ThresholdPolicy, evaluate_turn_thresholds
 from .queue import ExecutionQueue, JobState
+from .utils.audit import compute_config_fingerprint, log_audit_event
+from .utils.run_id import compute_run_id
 
 
 # ---- Data types for reporting ----
@@ -190,6 +192,8 @@ def evaluate_run(
     cancel_event: Optional[threading.Event] = None,
     on_progress: Optional[ProgressCallback] = None,
     get_response: Callable[[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], str] = default_get_response,
+    audit_actor: Optional[str] = None,
+    audit_log_path: Optional[str | Path] = None,
 ) -> OrchestratorSummary:
     """Run an evaluation over all datasets x models.
 
@@ -197,8 +201,10 @@ def evaluate_run(
     - Supports cancellation via threading.Event.
     - Uses get_response callback to obtain the text to score for a turn.
     """
+    config_path: Optional[Path] = None
     if isinstance(run, (str, Path)):
         rc = load_run_config(run)
+        config_path = Path(run)
     else:
         rc = run
 
@@ -226,6 +232,20 @@ def evaluate_run(
 
     results: List[ConversationEvaluation] = []
     cancelled_flag = False
+
+    # Audit: run started
+    run_id = rc.run_id or compute_run_id(rc)
+    cfg_fp = compute_config_fingerprint(rc, config_path)
+    log_audit_event(
+        action="evaluation_started",
+        actor=audit_actor,
+        run_id=run_id,
+        config_path=config_path,
+        config_fingerprint=cfg_fp,
+        source="orchestrator",
+        details={"datasets": len(rc.datasets), "models": len(rc.models)},
+        log_path=audit_log_path,
+    )
 
     if max_workers <= 1:
         # Sequential execution
@@ -255,7 +275,21 @@ def evaluate_run(
                 if res.status == "cancelled":
                     cancelled_flag = True
 
-    return OrchestratorSummary(results=results, cancelled=cancelled_flag)
+    summary = OrchestratorSummary(results=results, cancelled=cancelled_flag)
+
+    # Audit: run completed
+    log_audit_event(
+        action="evaluation_completed",
+        actor=audit_actor,
+        run_id=run_id,
+        config_path=config_path,
+        config_fingerprint=cfg_fp,
+        source="orchestrator",
+        details={"cancelled": cancelled_flag},
+        log_path=audit_log_path,
+    )
+
+    return summary
 
 
 def evaluate_run_with_queue(
@@ -265,10 +299,19 @@ def evaluate_run_with_queue(
     *,
     on_progress: Optional[ProgressCallback] = None,
     get_response: Callable[[Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], str] = default_get_response,
+    audit_actor: Optional[str] = None,
+    audit_log_path: Optional[str | Path] = None,
 ) -> OrchestratorSummary:
     """Wrapper that integrates the orchestrator with ExecutionQueue cancellation and state updates."""
     queue.start_job(job_id)
-    summary = evaluate_run(run, cancel_event=queue.get_cancel_event(job_id), on_progress=on_progress, get_response=get_response)
+    summary = evaluate_run(
+        run,
+        cancel_event=queue.get_cancel_event(job_id),
+        on_progress=on_progress,
+        get_response=get_response,
+        audit_actor=audit_actor,
+        audit_log_path=audit_log_path,
+    )
     # Update final state based on summary.cancelled
     if summary.cancelled:
         queue.update_state(job_id, JobState.CANCELLED)

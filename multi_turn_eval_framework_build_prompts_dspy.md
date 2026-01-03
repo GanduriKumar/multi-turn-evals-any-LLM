@@ -804,7 +804,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_rescoring.py) that simulate evaluator overrides and verify that pass/fail statuses and aggregated scores are updated while original scores remain stored.
 
-# [ ] Prompt051 — Implement golden update workflow
+# [x] Prompt051 — Implement golden update workflow
 
 Prompt:
 
@@ -820,7 +820,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_golden_update.py) that propose updates, approve them, and verify that new golden files are created with incremented versions.
 
-# [ ] Prompt052 — Implement audit logging of evaluation activity
+# [x] Prompt052 — Implement audit logging of evaluation activity
 
 Prompt:
 

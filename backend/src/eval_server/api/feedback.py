@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 import json
+
+from eval_server.utils.audit import log_audit_event
 
 router = APIRouter()
 
@@ -76,7 +78,7 @@ def _load_existing(path: Path) -> Dict[str, Any]:
 
 
 @router.post("/feedback", response_model=SubmitFeedbackResponse)
-def submit_feedback(req: SubmitFeedbackRequest) -> SubmitFeedbackResponse:
+def submit_feedback(req: SubmitFeedbackRequest, x_user: str | None = Header(default=None, alias="X-User")) -> SubmitFeedbackResponse:
     """Submit evaluator feedback for a run. Appends to annotations.json in the run directory.
 
     The stored file structure:
@@ -103,4 +105,17 @@ def submit_feedback(req: SubmitFeedbackRequest) -> SubmitFeedbackResponse:
     payload = {"run_id": run_id, "annotations": annotations}
     store_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    return SubmitFeedbackResponse(run_id=run_id, stored_path=str(store_path.resolve()), total_records=len(new_items))
+    resp = SubmitFeedbackResponse(run_id=run_id, stored_path=str(store_path.resolve()), total_records=len(new_items))
+
+    # Audit log feedback submission (best effort)
+    log_audit_event(
+        action="feedback_submitted",
+        run_id=run_id,
+        actor=x_user,
+        source="api",
+        config_path=None,
+        config_fingerprint=None,
+        details={"records": len(new_items)},
+    )
+
+    return resp

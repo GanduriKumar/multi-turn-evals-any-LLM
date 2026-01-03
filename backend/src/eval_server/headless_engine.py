@@ -83,7 +83,14 @@ def _load_baseline_scores(path: Union[str, Path]) -> Optional[Dict[str, float]]:
         return None
 
 
-def run_headless(run: RunConfig | str | Path, *, output_dir: str | Path | None = None, baseline_summary: str | Path | None = None) -> Path:
+def run_headless(
+    run: RunConfig | str | Path,
+    *,
+    output_dir: str | Path | None = None,
+    baseline_summary: str | Path | None = None,
+    audit_actor: str | None = None,
+    audit_log_path: str | Path | None = None,
+) -> Path:
     """Run evaluations from a run configuration and write artifacts.
 
     Returns the output directory path used.
@@ -100,7 +107,13 @@ def run_headless(run: RunConfig | str | Path, *, output_dir: str | Path | None =
     def on_progress(evt: Dict[str, Any]) -> None:
         progress_events.append(evt)
 
-    summary: OrchestratorSummary = evaluate_run(rc, cancel_event=cancel, on_progress=on_progress)
+    summary: OrchestratorSummary = evaluate_run(
+        rc if not isinstance(run, (str, Path)) else run,
+        cancel_event=cancel,
+        on_progress=on_progress,
+        audit_actor=audit_actor,
+        audit_log_path=audit_log_path,
+    )
     summary_json = _serialize_summary(summary)
     # store summary and a simple manifest
     summary_path = Path(out_dir) / "summary.json"
@@ -258,6 +271,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("--generate-comparison", type=str, default=None, help="Generate comparison report vs another results.json")
     parser.add_argument("--generate-pdf", action="store_true", help="Generate PDF report (requires wkhtmltopdf)")
     parser.add_argument("--theme", type=str, default="default", choices=["default", "dark", "compact"], help="Report theme")
+    parser.add_argument("--actor", type=str, default=None, help="Actor/user running this evaluation (for audit logging)")
+    parser.add_argument("--audit-log", type=str, default=None, help="Override audit log file path")
 
     args = parser.parse_args(argv)
 
@@ -294,7 +309,13 @@ def main(argv: Optional[list[str]] = None) -> int:
             thresholds=rc.thresholds,
         )
 
-    out_dir = run_headless(rc, output_dir=args.output, baseline_summary=args.baseline)
+    out_dir = run_headless(
+        rc,
+        output_dir=args.output,
+        baseline_summary=args.baseline,
+        audit_actor=args.actor,
+        audit_log_path=args.audit_log,
+    )
     print(f"Headless run complete. Artifacts written to: {out_dir}")
     
     # Generate reports if requested

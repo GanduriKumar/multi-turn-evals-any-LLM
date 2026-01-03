@@ -42,3 +42,18 @@ def versioned_name(base: str, version: str, *, sep: str = "-") -> str:
     # Generate versioned artifact names like results-1.0.0
     _ = parse_version(version)  # validate
     return f"{base}{sep}{version}"
+
+
+def bump_version(version: str, part: str = "patch") -> SemVer:
+    """Return a bumped semantic version.
+
+    part: one of "major", "minor", "patch" (default)
+    """
+    v = parse_version(version)
+    if part == "major":
+        return SemVer(v.major + 1, 0, 0)
+    if part == "minor":
+        return SemVer(v.major, v.minor + 1, 0)
+    if part == "patch":
+        return SemVer(v.major, v.minor, v.patch + 1)
+    raise ValueError("part must be one of: major, minor, patch")
