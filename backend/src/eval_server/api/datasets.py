@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException, Query
+from ..utils.errors import NotFoundError, BadRequestError
 from pydantic import BaseModel
 
 from ..data.loader import load_conversation, load_golden
@@ -78,7 +79,7 @@ def _get_dataset_by_id(dataset_id: str) -> DatasetInfo:
     for d in _list_example_datasets():
         if d.id == dataset_id:
             return d
-    raise HTTPException(status_code=404, detail="dataset not found")
+    raise NotFoundError("dataset not found")
 
 
 @router.get("/{dataset_id}/conversations/{conversation_id}", response_model=ConversationGoldenResponse, summary="Get conversation and golden", description="Return conversation JSON and filtered golden expectations for a dataset conversation.")
@@ -90,8 +91,7 @@ def get_conversation_details(dataset_id: str, conversation_id: str) -> Conversat
 
     conv_id = str(conv.get("conversation_id"))
     if conv_id != conversation_id:
-        # The requested conversation_id doesn't match the file's conversation
-        raise HTTPException(status_code=404, detail="conversation not found in dataset")
+        raise NotFoundError("conversation not found in dataset")
 
     # Filter golden expectations for this conversation id
     root_conv = str(gold.get("conversation_id", "") or "").strip()
@@ -130,4 +130,4 @@ def get_dataset(dataset_id: str):
     for d in _list_example_datasets():
         if d.id == dataset_id:
             return d
-    raise HTTPException(status_code=404, detail="dataset not found")
+    raise NotFoundError("dataset not found")

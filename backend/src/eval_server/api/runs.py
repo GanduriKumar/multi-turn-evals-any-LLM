@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Mapping
 import threading
 
 from fastapi import APIRouter, HTTPException, Query, Header
-from fastapi.responses import FileResponse, StreamingResponse
+from ..utils.errors import NotFoundError, BadRequestError
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from pydantic import BaseModel
 
 from ..config.run_config_loader import (
@@ -58,7 +59,7 @@ def start_run(req: RunStartRequest) -> RunStartResponse:
         if not req.version or not isinstance(req.datasets, list) or not isinstance(req.models, list) or len(req.datasets) == 0 or len(req.models) == 0:
             raise ValueError("invalid run configuration")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise BadRequestError(str(e))
 
     # Compute run_id (deterministic) using compute_run_id requires RunConfig, so construct it with loader by writing to a temp JSON in memory is not supported.
     # We fallback to using compute_run_id on the dict directly (it accepts Mapping), which will read versions from files.
@@ -112,9 +113,9 @@ def start_run(req: RunStartRequest) -> RunStartResponse:
             thresholds=thr,
         )
     except KeyError as e:
-        raise HTTPException(status_code=400, detail=f"missing field: {e}")
+        raise BadRequestError(f"missing field: {e}")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"invalid run configuration: {e}")
+        raise BadRequestError(f"invalid run configuration: {e}")
 
     run_id = compute_run_id(rc)
 
@@ -128,10 +129,13 @@ def start_run(req: RunStartRequest) -> RunStartResponse:
             # Use headless engine to produce full artifacts (raw, normalized, scores, results.json)
             def _on_progress(evt: Dict[str, Any]) -> None:  # type: ignore[name-defined]
                 _progress.record_event(run_id, evt)
-            # Run evaluate_run to drive progress callbacks quickly, then run headless to write artifacts
-            evaluate_run(rc, cancel_event=_queue.get_cancel_event(job_id), on_progress=_on_progress)
-            # Write artifacts to runs/<run_id>
-            run_headless(rc, output_dir=None)
+            # Single-pass execution: generate artifacts and forward progress; support cancellation
+            run_headless(
+                rc,
+                output_dir=None,
+                on_progress=_on_progress,
+                cancel_event=_queue.get_cancel_event(job_id),
+            )
             _queue.update_state(job_id, JobState.SUCCEEDED)  # type: ignore[name-defined]
         except Exception as e:  # pragma: no cover - unexpected runtime errors
             _queue.update_state(job_id, JobState.FAILED, message=str(e))  # type: ignore[name-defined]
@@ -176,12 +180,12 @@ def get_conversation_metrics(
     """
     try:
         run_dir = _find_run_dir_results(run_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="run not found")
+    except NotFoundError as e:
+        raise e
 
     results_path = run_dir / "results.json"
     if not results_path.exists():
-        raise HTTPException(status_code=404, detail="results not found for run")
+        raise NotFoundError("results not found for run")
 
     data = _json.loads(results_path.read_text(encoding="utf-8"))
     all_results = data.get("results") or []
@@ -266,7 +270,7 @@ def download_artifacts(
             resolved_files.append(("results.json", str(results_path)))
         elif item == "summary":
             if not summary_path.exists():
-                raise HTTPException(status_code=404, detail="summary not found for run")
+                raise NotFoundError("summary not found for run")
             resolved_files.append(("summary.json", str(summary_path)))
         elif item == "csv":
             csv_path = results_path.with_suffix(".csv")
@@ -295,22 +299,22 @@ def download_artifacts(
         elif item == "raw":
             raw_path = run_dir / "raw_outputs.jsonl"
             if not raw_path.exists():
-                raise HTTPException(status_code=404, detail="raw outputs not found for run")
+                raise NotFoundError("raw outputs not found for run")
             resolved_files.append((raw_path.name, str(raw_path)))
         elif item == "normalized":
             norm_path = run_dir / "normalized.jsonl"
             if not norm_path.exists():
-                raise HTTPException(status_code=404, detail="normalized outputs not found for run")
+                raise NotFoundError("normalized outputs not found for run")
             resolved_files.append((norm_path.name, str(norm_path)))
         elif item == "turn_scores":
             ts_path = run_dir / "scores" / "turn_scores.jsonl"
             if not ts_path.exists():
-                raise HTTPException(status_code=404, detail="turn scores not found for run")
+                raise NotFoundError("turn scores not found for run")
             resolved_files.append((ts_path.name, str(ts_path)))
         elif item == "progress":
             pr_path = run_dir / "logs" / "progress.jsonl"
             if not pr_path.exists():
-                raise HTTPException(status_code=404, detail="progress log not found for run")
+                raise NotFoundError("progress log not found for run")
             resolved_files.append((pr_path.name, str(pr_path)))
 
     # Single file: return directly
@@ -389,12 +393,12 @@ def submit_run_feedback(
     # Ensure run exists and results.json is present
     try:
         run_dir = _find_run_dir_results(run_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="run not found")
+    except NotFoundError as e:
+        raise e
 
     results_path = run_dir / "results.json"
     if not results_path.exists():
-        raise HTTPException(status_code=404, detail="results not found for run")
+        raise NotFoundError("results not found for run")
 
     # Build an index of valid (dataset_id, conversation_id, model_name, turn_id)
     results_data = _load_json(results_path)
@@ -415,7 +419,8 @@ def submit_run_feedback(
             errors.append(f"feedback[{i}] references unknown item: {key}")
 
     if errors:
-        raise HTTPException(status_code=400, detail={"errors": errors})
+        # For this endpoint, return a simple validation shape expected by tests
+        return JSONResponse(status_code=400, content={"detail": {"errors": errors}})
 
     # Load existing annotations
     store_path = _feedback_path_for_run(run_dir)
@@ -469,8 +474,8 @@ def get_run_feedback(run_id: str):
 def _load_results_payload(run_id: str) -> Dict[str, Any]:
     try:
         rdir = _find_run_dir_results(run_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"run not found: {run_id}")
+    except NotFoundError:
+        raise NotFoundError(f"run not found: {run_id}")
     rpath = rdir / "results.json"
     if not rpath.exists():
         raise HTTPException(status_code=404, detail=f"results not found for run: {run_id}")

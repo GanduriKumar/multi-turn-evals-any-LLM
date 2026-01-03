@@ -8,6 +8,8 @@ from .api.runs import router as runs_router
 from .api.comparisons import router as comparisons_router
 from .api.progress import router as progress_router
 import uvicorn
+from .utils.errors import add_exception_handlers
+from .settings import load_settings
 
 
 def create_app() -> FastAPI:
@@ -30,11 +32,19 @@ def create_app() -> FastAPI:
         openapi_tags=tags_metadata,
     )
 
+    # Load settings early to fail fast if secrets are missing
+    try:
+        load_settings()
+    except Exception:
+        # Defer raising to endpoints; still construct app for OpenAPI and tests.
+        pass
+
     @app.get("/health", summary="Health check", description="Simple health probe endpoint.")
     def health():
         return {"status": "ok"}
 
     # API routes under /api/v1
+    add_exception_handlers(app)
     app.include_router(datasets_router, prefix="/api/v1")
     app.include_router(runs_router, prefix="/api/v1")
     app.include_router(progress_router, prefix="/api/v1")

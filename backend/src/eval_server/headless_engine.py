@@ -5,7 +5,7 @@ import json
 import threading
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, Union, List
+from typing import Any, Dict, Mapping, Optional, Union, List, Callable
 
 from .config.run_config_loader import RunConfig, load_run_config
 from .orchestrator import OrchestratorSummary, evaluate_run
@@ -90,6 +90,8 @@ def run_headless(
     baseline_summary: str | Path | None = None,
     audit_actor: str | None = None,
     audit_log_path: str | Path | None = None,
+    on_progress: Optional[Callable[[Dict[str, Any]], None]] = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> Path:
     """Run evaluations from a run configuration and write artifacts.
 
@@ -100,17 +102,22 @@ def run_headless(
     _ensure_dir(out_dir)
 
     # Optional: adjust concurrency via CLI override is handled in main()
-    cancel = threading.Event()
+    cancel = cancel_event or threading.Event()
 
-    # Capture progress events for logs
+    # Capture progress events for logs and optionally stream outward
     progress_events: List[Dict[str, Any]] = []
-    def on_progress(evt: Dict[str, Any]) -> None:
+    def _on_progress(evt: Dict[str, Any]) -> None:
         progress_events.append(evt)
+        if on_progress is not None:
+            try:
+                on_progress(evt)
+            except Exception:
+                pass
 
     summary: OrchestratorSummary = evaluate_run(
         rc if not isinstance(run, (str, Path)) else run,
         cancel_event=cancel,
-        on_progress=on_progress,
+        on_progress=_on_progress,
         audit_actor=audit_actor,
         audit_log_path=audit_log_path,
     )

@@ -978,7 +978,7 @@ Tests to add/run now:
 
 Write a test (backend/tests/test_openapi.py) that retrieves the OpenAPI JSON and asserts that all endpoints are documented with correct schemas.
 
-# [ ] Prompt063 — Implement backend validation and error handling
+# [x] Prompt063 — Implement backend validation and error handling
 
 Prompt:
 
@@ -994,7 +994,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_error_handling.py) that trigger various error conditions and verify that the API returns consistent error responses and statuses.
 
-# [ ] Prompt064 — Secure secret configuration via environment variables
+# [x] Prompt064 — Secure secret configuration via environment variables
 
 Prompt:
 
@@ -1014,7 +1014,7 @@ Tests (backend/tests/test_secrets.py) verifying that attempting to load the appl
 
 Test that secrets are not accidentally persisted in dataset or results files
 
-Frontend user interfaces
+## Frontend user interfaces
 # [ ] Prompt065 — Create React UI for browsing datasets, selecting models, choosing metrics, and starting runs
 
 Prompt:

@@ -1,0 +1,30 @@
+{
+  "version": "1.0.0",
+  "datasets": [
+    {
+      "conversation": "C:/Users/kumar.gn/PycharmProjects/multi-turn-evals-any-llm/configs/datasets/examples/conversation_001.json",
+      "golden": "C:/Users/kumar.gn/PycharmProjects/multi-turn-evals-any-llm/configs/datasets/examples/conversation_001.golden.yaml",
+      "id": "conv001",
+      "tags": null,
+      "difficulty": null
+    }
+  ],
+  "models": [
+    {
+      "name": "dummy",
+      "provider": "dummy",
+      "model": "dummy",
+      "params": null,
+      "concurrency": null
+    }
+  ],
+  "run_id": null,
+  "name": null,
+  "description": null,
+  "output_dir": null,
+  "random_seed": null,
+  "metric_bundles": null,
+  "truncation": null,
+  "concurrency": null,
+  "thresholds": null
+}

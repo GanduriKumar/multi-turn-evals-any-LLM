@@ -10,6 +10,26 @@
       "notes": "ok",
       "override_pass": true,
       "override_score": 0.9
+    },
+    {
+      "dataset_id": "ds-1",
+      "conversation_id": "conv-1",
+      "model_name": "m-1",
+      "turn_id": "t1",
+      "rating": 4.5,
+      "notes": "ok",
+      "override_pass": true,
+      "override_score": 0.9
+    },
+    {
+      "dataset_id": "ds-1",
+      "conversation_id": "conv-1",
+      "model_name": "m-1",
+      "turn_id": "t1",
+      "rating": 4.5,
+      "notes": "ok",
+      "override_pass": true,
+      "override_score": 0.9
     }
   ]
 }

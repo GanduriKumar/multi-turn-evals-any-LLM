@@ -1,0 +1,11 @@
+{
+  "datasets": [
+    {
+      "conversation": "C:/Users/kumar.gn/PycharmProjects/multi-turn-evals-any-llm/configs/datasets/examples/conversation_001.json",
+      "golden": "C:/Users/kumar.gn/PycharmProjects/multi-turn-evals-any-llm/configs/datasets/examples/conversation_001.golden.yaml",
+      "id": "conv001",
+      "tags": null,
+      "difficulty": null
+    }
+  ]
+}

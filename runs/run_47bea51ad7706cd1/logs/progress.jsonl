@@ -1,0 +1,3 @@
+{"event": "start", "dataset_id": "conv001", "model": "dummy", "conversation": "C:/Users/kumar.gn/PycharmProjects/multi-turn-evals-any-llm/configs/datasets/examples/conversation_001.json"}
+{"event": "turn", "dataset_id": "conv001", "model": "dummy", "turn_id": "t3", "passed": false}
+{"event": "end", "dataset_id": "conv001", "model": "dummy", "conversation_id": "conv-001", "status": "completed", "score": 1.0, "conversation_pass": true}

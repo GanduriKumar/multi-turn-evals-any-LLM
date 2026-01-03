@@ -10,6 +10,30 @@
       "notes": "Looks good",
       "override_pass": true,
       "override_score": 0.9
+    },
+    {
+      "dataset_id": "conv001",
+      "conversation_id": "conv-001",
+      "model_name": "dummy",
+      "turn_id": "t2",
+      "rating": 4.0,
+      "notes": "Looks good",
+      "override_pass": true,
+      "override_score": 0.9,
+      "actor": "tester",
+      "ts": 1767467569.1993215
+    },
+    {
+      "dataset_id": "conv001",
+      "conversation_id": "conv-001",
+      "model_name": "dummy",
+      "turn_id": "t2",
+      "rating": 4.0,
+      "notes": "Looks good",
+      "override_pass": true,
+      "override_score": 0.9,
+      "actor": "tester",
+      "ts": 1767467666.6335003
     }
   ]
 }

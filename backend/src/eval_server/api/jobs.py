@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
+from ..utils.errors import NotFoundError
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -26,7 +27,7 @@ def get_job(job_id: str):
     try:
         return _queue.get_job(job_id)
     except KeyError:
-        raise HTTPException(status_code=404, detail="job not found")
+        raise NotFoundError("job not found")
 
 
 @router.get("/", summary="List jobs", description="List jobs in the queue, optionally filtered by state.")
@@ -40,4 +41,4 @@ def cancel_job(job_id: str):
         _queue.cancel_job(job_id, reason="cancelled via API")
         return {"status": "ok"}
     except KeyError:
-        raise HTTPException(status_code=404, detail="job not found")
+        raise NotFoundError("job not found")

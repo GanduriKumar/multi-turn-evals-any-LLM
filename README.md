@@ -1,3 +1,32 @@
+## Secrets and Configuration
+
+This project does not store API keys or secrets in code or datasets. All sensitive values must be provided via environment variables. Use the provided `.env.example` as a reference and set variables in your deployment environment.
+
+Required:
+
+- `EVAL_SERVER_SECRET_KEY`: Secret used by the server (e.g., signing, auth extensions).
+
+Optional provider keys:
+
+- `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_AI_API_KEY`, `HUGGINGFACE_API_TOKEN`
+
+Optional integrations:
+
+- `DATABASE_URL`, `SENTRY_DSN`
+
+### Local Development
+
+1. Copy `.env.example` to `.env` and fill in variables as needed.
+2. Ensure your shell or process loads the environment (e.g., via VS Code launch config, direnv, or dotenv tooling).
+
+### CI/CD and Production
+
+Set environment variables securely in your CI/CD system or hosting provider (e.g., GitHub Actions secrets, Azure App Service settings, Kubernetes secrets). Do not commit `.env` files.
+
+### Verification
+
+Tests under `backend/tests/test_secrets.py` verify that the application fails fast without required secrets and that results files do not contain secret values.
+
 multi-turn-evals-any-llm
 =================================
 

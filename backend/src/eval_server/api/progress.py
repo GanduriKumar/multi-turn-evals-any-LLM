@@ -4,6 +4,7 @@ import asyncio
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
+from ..utils.errors import NotFoundError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.websockets import WebSocket, WebSocketDisconnect
@@ -40,7 +41,7 @@ def get_progress(run_id: str):
             events=list(status.get("events", [])),
         )
     except KeyError:
-        raise HTTPException(status_code=404, detail="run not found")
+        raise NotFoundError("run not found")
 
 
 @router.websocket("/{run_id}/progress/ws")
