@@ -534,7 +534,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_normalizer.py) that take raw outputs and verify that the normalized records have consistent structure and content.
 
-# [ ] Prompt032 — Provide automatic scoring per turn against golden reference
+# [x] Prompt032 — Provide automatic scoring per turn against golden reference
 
 Prompt:
 
@@ -548,7 +548,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_turn_scoring.py) that compare sample outputs to goldens and verify that scores and pass/fail results are computed correctly.
 
-# [ ] Prompt033 — Provide automatic scoring for full conversation outcomes
+# [x] Prompt033 — Provide automatic scoring for full conversation outcomes
 
 Prompt:
 

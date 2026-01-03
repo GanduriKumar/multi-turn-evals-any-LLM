@@ -11,7 +11,9 @@ from .config.run_config_loader import RunConfig, load_run_config
 from .data.loader import load_conversation, load_golden
 from .data.golden_access import index_golden
 from .evaluation.scoring import score_turn
-from .evaluation.weights import aggregate_conversation
+from .evaluation.weights import aggregate_conversation, weighted_average
+from .scoring.normalizer import normalize_turn_output
+from .scoring.turn_scoring import score_turn_canonical
 from .queue import ExecutionQueue, JobState
 
 
@@ -116,10 +118,18 @@ def _evaluate_dataset_model(
         expected = expected_index.get((conv_id, tid), {})
         # Fetch actual text using callback
         actual_text = get_response(t, model, conv)
-        res = score_turn(actual_text, expected)
-        passed = bool(res.get("passed", False))
-        turn_results.append(TurnEvaluation(turn_id=tid, passed=passed, matched_variant=res.get("matched_variant")))
-        turn_scores[tid] = 1.0 if passed else 0.0
+        # Normalize output; context lines omitted here for simplicity
+        canonical = normalize_turn_output(actual_text, [])
+        # Determine thresholds from optional run-level config (not available here), so default empty
+        # Per-turn thresholds can be passed via expected.conditions in future; for now use defaults
+        metric_thresholds: Dict[str, float] = {}
+        scores_by_metric, metrics_pass = score_turn_canonical(canonical, expected, thresholds=metric_thresholds)
+        # Combine metrics into a single turn score using optional weights from expected
+        weights = expected.get("weights") or {}
+        turn_score = weighted_average(scores_by_metric, weights if weights else None)
+        passed = metrics_pass
+        turn_results.append(TurnEvaluation(turn_id=tid, passed=passed, matched_variant=None))
+        turn_scores[tid] = float(turn_score)
         # Per-turn weight if provided
         turn_weights[tid] = float(expected.get("turn_weight", 1.0) or 1.0)
 
