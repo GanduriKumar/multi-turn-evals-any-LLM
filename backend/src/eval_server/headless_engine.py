@@ -9,6 +9,9 @@ from typing import Any, Dict, Optional
 
 from .config.run_config_loader import RunConfig, load_run_config
 from .orchestrator import OrchestratorSummary, evaluate_run
+from .utils.run_id import compute_run_id
+from .runner.turn_runner import TurnRunner
+from .data.loader import load_conversation
 
 
 def _ensure_dir(path: Path) -> None:
@@ -19,14 +22,23 @@ def _resolve_output_dir(rc: RunConfig, override: Optional[str | Path]) -> Path:
     if override:
         return Path(override)
     if rc.output_dir:
-        return Path(rc.output_dir)
+        # Embed run id in output dir for uniqueness
+        rid = compute_run_id(rc)
+        return Path(rc.output_dir) / rid
     # Fallback
-    return Path("runs") / "_headless_output"
+    rid = compute_run_id(rc)
+    return Path("runs") / rid
 
 
 def _write_json(path: Path, data: Dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def _write_jsonl(path: Path, rows: list[Dict[str, Any]]) -> None:
+    with path.open("w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
 def _serialize_summary(summary: OrchestratorSummary) -> Dict[str, Any]:
@@ -48,8 +60,39 @@ def run_headless(config_path: str | Path, *, output_dir: str | Path | None = Non
 
     summary: OrchestratorSummary = evaluate_run(rc, cancel_event=cancel)
     summary_json = _serialize_summary(summary)
-
+    # store summary and a simple manifest
     _write_json(Path(out_dir) / "summary.json", summary_json)
+    _write_json(Path(out_dir) / "manifest.json", {"run_id": compute_run_id(rc), "datasets": [d.conversation for d in rc.datasets]})
+
+    # Additionally, generate and store per-turn raw outputs as JSONL using TurnRunner
+    raw_rows: list[Dict[str, Any]] = []
+    for ds in rc.datasets:
+        conv = load_conversation(ds.conversation)
+        conv_id = str(conv.get("conversation_id"))
+        for m in rc.models:
+            runner = TurnRunner(m.provider, **(m.params or {}))
+            policy = rc.truncation.strategy if rc.truncation else None
+            trunc_params: Dict[str, int] = {}
+            results = runner.run(conv, truncation_policy=policy, truncation_params=trunc_params)
+            for r in results:
+                row: Dict[str, Any] = {
+                    "dataset_id": ds.id,
+                    "conversation_id": conv_id,
+                    "turn_id": r.turn_id,
+                    "model_name": m.name,
+                    "provider": m.provider,
+                    "prompt": r.prompt,
+                    "response": r.response,
+                    "context": r.context,
+                    "error": r.error,
+                }
+                if r.llm_request is not None:
+                    row["llm_request"] = r.llm_request.model_dump(mode="json")
+                if r.llm_response is not None:
+                    row["llm_response"] = r.llm_response.model_dump(mode="json")
+                raw_rows.append(row)
+
+    _write_jsonl(Path(out_dir) / "raw_outputs.jsonl", raw_rows)
     return out_dir
 
 

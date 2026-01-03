@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
+import uuid
 from typing import Any, Dict, List, Mapping, Optional, Union, Callable
 
 from ..llm import LLMProvider, create_provider  # ensures providers are imported and registered
 from ..utils.truncation import make_truncator
+from ..schemas.llm import LLMRequest, LLMResponse, ModelMetadata, TokenUsage
 
 
 @dataclass(frozen=True)
@@ -13,6 +16,9 @@ class TurnRunResult:
     prompt: str
     response: str
     context: List[str]
+    llm_request: Optional[LLMRequest] = None
+    llm_response: Optional[LLMResponse] = None
+    error: Optional[str] = None
 
 
 ToolOutputHook = Callable[[str, Mapping[str, Any], Mapping[str, Any], Mapping[str, Any]], Any]
@@ -95,8 +101,10 @@ class TurnRunner:
     def __init__(self, provider: LLMProvider | str, **provider_init: Any) -> None:
         if isinstance(provider, str):
             self._provider: LLMProvider = create_provider(provider, **provider_init)
+            self._provider_name = provider
         else:
             self._provider = provider
+            self._provider_name = (provider.metadata().get("name") or "custom")
         self._tool_hook: Optional[ToolOutputHook] = None
 
     def run(
@@ -138,20 +146,71 @@ class TurnRunner:
                     used_context = trunc(base_context)
                 else:
                     used_context = base_context
-                response = self._provider.generate(prompt_text, context=used_context)
+                # Build request metadata
+                prov_meta = self._provider.metadata() or {}
+                model_meta = ModelMetadata(provider=self._provider_name, model_id=str(prov_meta.get("name") or prov_meta.get("model", "unknown")))
+                req = LLMRequest(
+                    request_id=str(uuid.uuid4()),
+                    prompt=prompt_text,
+                    context=list(used_context),
+                    model=model_meta,
+                )
+
+                start = perf_counter()
+                err: Optional[str] = None
+                resp_text = ""
+                try:
+                    resp_text = self._provider.generate(prompt_text, context=used_context)
+                except Exception as e:
+                    err = f"{type(e).__name__}: {e}"
+                end = perf_counter()
+                latency_ms = max(0.0, (end - start) * 1000.0)
+
+                # Prefer provider-exposed usage if available (e.g., dummy has last_metadata)
+                prompt_tok: int
+                completion_tok: int
+                meta_hook = getattr(self._provider, "last_metadata", None)
+                if callable(meta_hook):
+                    lm = meta_hook() or {}
+                    usage_map = lm.get("usage") or {}
+                    prompt_tok = int(usage_map.get("prompt_tokens", 0))
+                    completion_tok = int(usage_map.get("completion_tokens", 0)) if err is None else 0
+                else:
+                    # Fallback: approximate based on whitespace tokens of prompt+context and completion
+                    prompt_tok = sum(len(s.split()) for s in used_context) + len(prompt_text.split())
+                    completion_tok = len(resp_text.split()) if err is None else 0
+                usage = TokenUsage(prompt_tokens=prompt_tok, completion_tokens=completion_tok)
+                provider_metadata = dict(prov_meta)
+                provider_metadata["context_length"] = len(used_context)
+                if err is not None:
+                    provider_metadata["error"] = err
+
+                resp_obj: Optional[LLMResponse] = None
+                if err is None:
+                    resp_obj = LLMResponse(
+                        request_id=req.request_id,
+                        model=model_meta,
+                        text=resp_text,
+                        usage=usage,
+                        latency_ms=latency_ms,
+                        provider_metadata=provider_metadata,
+                    )
 
                 # Record result
                 results.append(TurnRunResult(
                     turn_id=str(turn.get("turn_id", "")),
                     prompt=prompt_text,
-                    response=response,
+                    response=resp_text,
                     context=list(used_context),
+                    llm_request=req,
+                    llm_response=resp_obj,
+                    error=err,
                 ))
 
                 # After generating, extend the global context with the user content and assistant response
                 # Include the full user line (content_part) to context, then assistant response
                 context.extend(content_part)
-                context.append(f"ASSISTANT: {response}")
+                context.append(f"ASSISTANT: {resp_text}")
             else:
                 # Non-user turns contribute their lines to the context
                 context.extend(turn_ctx_parts)

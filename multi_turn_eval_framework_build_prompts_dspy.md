@@ -500,7 +500,7 @@ Tests to add/run now:
 
 Write tests (backend/tests/test_tool_hooks.py) that define a mock hook returning a sample tool output and verify that the turn runner injects the tool output correctly into the conversation context.
 
-# [ ] Prompt030 — Capture raw LLM outputs per turn
+# [x] Prompt030 — Capture raw LLM outputs per turn
 
 Prompt:
 
@@ -518,7 +518,7 @@ Write tests (backend/tests/test_raw_outputs.py) that simulate LLM calls and veri
 
 Test error scenarios and ensure metadata captures error details.
 
-# [ ] Prompt031 — Normalize LLM outputs into canonical evaluation records
+# [x] Prompt031 — Normalize LLM outputs into canonical evaluation records
 
 Prompt:
 
