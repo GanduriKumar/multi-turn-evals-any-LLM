@@ -11,13 +11,14 @@ function cx(...classes: Array<string | undefined | false>) {
 function variantClasses(variant: Variant) {
   switch (variant) {
     case 'primary':
-      return 'bg-blue-600 text-white hover:bg-blue-700'
+      return 'bg-brand-500 text-white hover:bg-brand-600 shadow-sm'
     case 'secondary':
-      return 'bg-gray-800 text-white hover:bg-gray-900'
+      return 'bg-slate-800 text-white hover:bg-slate-900 shadow-sm'
     case 'outline':
-      return 'border border-gray-300 hover:bg-gray-50'
+      return 'border border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
     case 'danger':
-      return 'bg-red-600 text-white hover:bg-red-700'
+      // Outline-style danger to match design image (Abort button)
+      return 'border border-red-300 text-red-600 bg-white hover:bg-red-50'
     default:
       return ''
   }
@@ -26,13 +27,13 @@ function variantClasses(variant: Variant) {
 function sizeClasses(size: Size) {
   switch (size) {
     case 'sm':
-      return 'px-2 py-1 text-sm rounded'
+      return 'px-3 py-1.5 text-sm rounded-md'
     case 'md':
-      return 'px-3 py-2 rounded'
+      return 'px-3.5 py-2 rounded-md'
     case 'lg':
-      return 'px-4 py-2 text-lg rounded'
+      return 'px-5 py-2.5 text-lg rounded-md'
     default:
-      return 'px-3 py-2 rounded'
+      return 'px-3.5 py-2 rounded-md'
   }
 }
 
@@ -64,7 +65,12 @@ export type ButtonProps = ButtonAsButton | ButtonAsLink | ButtonAsAnchor
 
 export default function Button(props: ButtonProps) {
   const { children, className, variant = 'outline', size = 'md' } = props
-  const classes = cx(variantClasses(variant), sizeClasses(size), 'disabled:opacity-50', className)
+  const classes = cx(
+    variantClasses(variant),
+    sizeClasses(size),
+    'disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
+    className,
+  )
 
   if ('to' in props && props.to) {
     const { to, onClick, ...rest } = props as ButtonAsLink

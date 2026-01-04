@@ -27,6 +27,7 @@ function App() {
           <Route path="/conversation/:runId/:conversationId" element={<ConversationDetailPage />} />
           <Route path="/metrics/:runId" element={<MetricsBreakdownPage />} />
           <Route path="/compare" element={<RunComparisonPage />} />
+          <Route path="/reports" element={<div className="p-8 text-center text-gray-500">Reports Page Placeholder</div>} />
           <Route
             path="/viewer"
             element={

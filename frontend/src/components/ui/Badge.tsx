@@ -11,12 +11,12 @@ function toneClasses(tone: Tone) {
     case 'danger':
       return 'bg-red-100 text-red-700'
     case 'info':
-      return 'bg-blue-100 text-blue-700'
+      return 'bg-brand-50 text-brand-700'
     default:
       return 'bg-gray-100 text-gray-700'
   }
 }
 
 export default function Badge({ children, className = '', tone = 'neutral' }: { children: React.ReactNode; className?: string; tone?: Tone }) {
-  return <span className={`text-xs px-2 py-1 rounded ${toneClasses(tone)} ${className}`}>{children}</span>
+  return <span className={`text-xs px-2 py-1 rounded-md ${toneClasses(tone)} ${className}`}>{children}</span>
 }

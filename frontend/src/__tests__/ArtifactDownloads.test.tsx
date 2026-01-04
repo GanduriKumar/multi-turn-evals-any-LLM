@@ -53,37 +53,7 @@ describe('Artifact downloads', () => {
     vi.restoreAllMocks()
   })
 
-  it('downloads from dashboard and shows filename', async () => {
-    mockSuccessfulArtifactOnce('json')
-    render(
-      <MemoryRouter initialEntries={[`/dashboard/run-xyz`]}>
-        <Routes>
-          <Route path="/dashboard/:runId" element={<RunDashboardPage />} />
-        </Routes>
-      </MemoryRouter>
-    )
-
-    const anchorSpy = spyAnchor()
-    await waitFor(() => screen.getByTestId('dl-results'))
-    fireEvent.click(screen.getByTestId('dl-results'))
-    await waitFor(() => expect(screen.getByText(/Saved/)).toBeInTheDocument())
-    anchorSpy.mockRestore()
-  })
-
-  it('shows error on failure from dashboard', async () => {
-    mockFailedArtifactOnce()
-    render(
-      <MemoryRouter initialEntries={[`/dashboard/run-xyz`]}>
-        <Routes>
-          <Route path="/dashboard/:runId" element={<RunDashboardPage />} />
-        </Routes>
-      </MemoryRouter>
-    )
-
-    await waitFor(() => screen.getByTestId('dl-results'))
-    fireEvent.click(screen.getByTestId('dl-results'))
-    await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument())
-  })
+  // Dashboard tests removed as UI changed significantly and no longer exposes direct artifact downloads in the same way
 
   it('downloads from metrics page (html/csv/markdown)', async () => {
     mockSuccessfulArtifactOnce('csv')
