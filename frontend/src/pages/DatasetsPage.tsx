@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import PageHeader from '../components/layout/PageHeader'
 
 export type DatasetInfo = {
   id: string;
@@ -96,6 +97,7 @@ export default function DatasetsPage() {
 
   return (
     <div>
+      <PageHeader title="Datasets" subtitle="Filter, select, and load datasets to start a run" />
       <Card className="mb-4">
         <CardContent>
           <div className="flex gap-4 items-end">

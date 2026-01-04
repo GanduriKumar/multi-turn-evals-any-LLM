@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import PageHeader from '../components/layout/PageHeader'
 import { compareRuns } from '../utils/api'
 
 // Small helper for number formatting
@@ -67,16 +68,16 @@ export default function RunComparisonPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-semibold">Run Comparison</h2>
-          <div className="text-sm text-gray-600">Compare two runs and view deltas by dataset and metric.</div>
-        </div>
-        <div className="flex gap-2">
-          {baseline && <Button to={`/dashboard/${baseline}`}>Baseline Dashboard</Button>}
-          {current && <Button to={`/dashboard/${current}`}>Current Dashboard</Button>}
-        </div>
-      </div>
+      <PageHeader
+        title="Run Comparison"
+        subtitle="Compare two runs and view deltas by dataset and metric."
+        actions={
+          <>
+            {baseline && <Button to={`/dashboard/${baseline}`}>Baseline Dashboard</Button>}
+            {current && <Button to={`/dashboard/${current}`}>Current Dashboard</Button>}
+          </>
+        }
+      />
 
       <Card className="mb-4">
         <CardContent className="grid gap-3 md:grid-cols-2">

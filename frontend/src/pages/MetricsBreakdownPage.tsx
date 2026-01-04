@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import PageHeader from '../components/layout/PageHeader'
 import { useArtifactDownloader } from '../hooks/useArtifactDownloader';
 
 // Render a simple bar chart using canvas for performance and no extra deps
@@ -172,15 +173,7 @@ export default function MetricsBreakdownPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-semibold">Metrics Breakdown</h2>
-          <div className="text-sm text-gray-600">Run: <code>{runId}</code></div>
-        </div>
-        <div className="flex gap-2">
-          <Button to={`/dashboard/${runId}`}>Back to Dashboard</Button>
-        </div>
-      </div>
+      <PageHeader title="Metrics Breakdown" subtitle={<span>Run: <code>{runId}</code></span>} actions={<Button to={`/dashboard/${runId}`}>Back to Dashboard</Button>} />
 
       {error && <div className="text-red-600 mb-3">{error}</div>}
 

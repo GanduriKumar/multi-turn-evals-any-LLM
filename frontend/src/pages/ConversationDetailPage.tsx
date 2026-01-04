@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import PageHeader from '../components/layout/PageHeader'
 import { submitRunFeedback, type TurnFeedback } from '../utils/api';
 
 // Lightweight diff utility to highlight expected vs actual differences line-by-line
@@ -81,16 +82,11 @@ export default function ConversationDetailPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h2 className="text-xl font-semibold">Conversation</h2>
-          <div className="text-sm text-gray-600">Run: <code>{runId}</code> · Conversation: <code>{conversationId}</code> {modelName ? <>· Model: <code>{modelName}</code></> : null}</div>
-        </div>
-        <div className="flex gap-2">
-          <Button to={`/dashboard/${runId}`}>Back to Dashboard</Button>
-          <Button to={`/viewer`}>Viewer</Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Conversation"
+        subtitle={<span>Run: <code>{runId}</code> · Conversation: <code>{conversationId}</code> {modelName ? <>· Model: <code>{modelName}</code></> : null}</span>}
+        actions={<><Button to={`/dashboard/${runId}`}>Back to Dashboard</Button><Button to={`/viewer`}>Viewer</Button></>}
+      />
 
       {loading && <div>Loading…</div>}
       {error && <div className="text-red-600">{error}</div>}

@@ -3,7 +3,7 @@ import React from 'react'
 type DivProps = React.HTMLAttributes<HTMLDivElement>
 
 export function Card({ children, className = '', ...rest }: { children: React.ReactNode; className?: string } & DivProps) {
-  return <div className={`bg-white border rounded shadow-sm ${className}`} {...rest}>{children}</div>
+  return <div className={`bg-white border border-gray-200 rounded-lg shadow-sm ${className}`} {...rest}>{children}</div>
 }
 
 export function CardHeader({ children, className = '', ...rest }: { children: React.ReactNode; className?: string } & DivProps) {

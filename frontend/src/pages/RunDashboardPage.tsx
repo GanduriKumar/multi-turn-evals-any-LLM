@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import PageHeader from '../components/layout/PageHeader'
 import { useArtifactDownloader } from '../hooks/useArtifactDownloader';
 
 type ConversationProgress = {
@@ -74,10 +75,11 @@ export default function RunDashboardPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Run Dashboard</h2>
-        <div className="text-sm text-gray-600">Run ID: <code>{runId}</code></div>
-      </div>
+      <PageHeader
+        title="Run Dashboard"
+        subtitle={<span>Run ID: <code>{runId}</code></span>}
+        actions={<Button to={`/viewer`}>Open Viewer</Button>}
+      />
 
       {error && <div className="text-red-600 mb-3">{error}</div>}
 
@@ -92,7 +94,7 @@ export default function RunDashboardPage() {
               <Button variant="danger" disabled={!data || data.overall_status === 'completed'} onClick={cancelRun}>
                 Cancel Run
               </Button>
-              <Button to={`/viewer`} variant="primary">Open Viewer</Button>
+              <Button to={`/metrics/${runId}`} variant="primary">View Metrics</Button>
             </div>
           </div>
           <div className="mt-3">
@@ -144,7 +146,7 @@ export default function RunDashboardPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {(data?.conversations || []).map((c) => (
           <Card key={`${c.dataset_id}|${c.conversation_id}|${c.model}`}>
             <CardContent>
