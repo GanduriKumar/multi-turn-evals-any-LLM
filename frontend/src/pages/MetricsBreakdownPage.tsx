@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import Button from '../components/ui/Button'
 import { useArtifactDownloader } from '../hooks/useArtifactDownloader';
 
 // Render a simple bar chart using canvas for performance and no extra deps
@@ -176,13 +178,15 @@ export default function MetricsBreakdownPage() {
           <div className="text-sm text-gray-600">Run: <code>{runId}</code></div>
         </div>
         <div className="flex gap-2">
-          <Link className="px-3 py-2 rounded border" to={`/dashboard/${runId}`}>Back to Dashboard</Link>
+          <Button to={`/dashboard/${runId}`}>Back to Dashboard</Button>
         </div>
       </div>
 
       {error && <div className="text-red-600 mb-3">{error}</div>}
 
-      <div className="mb-4 p-4 bg-white border rounded flex flex-wrap gap-4 items-end">
+      <Card className="mb-4">
+        <CardContent>
+          <div className="flex flex-wrap gap-4 items-end">
         <div>
           <label htmlFor="metricSel" className="block text-sm font-medium">Metric</label>
           <select id="metricSel" className="border rounded p-2" value={metric} onChange={(e) => setMetric(e.target.value)}>
@@ -198,13 +202,13 @@ export default function MetricsBreakdownPage() {
           </select>
         </div>
         <div className="text-sm text-gray-600">Threshold: <strong>{turnPass ?? '—'}</strong></div>
-        <div className="ml-auto flex gap-2">
-          <button className="px-3 py-2 rounded border" onClick={exportCSV}>Export CSV</button>
-          <button className="px-3 py-2 rounded border" onClick={exportImage}>Export PNG</button>
-          <button className="px-3 py-2 rounded border disabled:opacity-50" disabled={downloading} onClick={() => download(['csv'])} data-testid="dl-csv">Download CSV</button>
-          <button className="px-3 py-2 rounded border disabled:opacity-50" disabled={downloading} onClick={() => download(['html'])} data-testid="dl-html">Download HTML</button>
-          <button className="px-3 py-2 rounded border disabled:opacity-50" disabled={downloading} onClick={() => download(['markdown'])} data-testid="dl-md">Download Markdown</button>
-        </div>
+          <div className="ml-auto flex gap-2">
+            <Button onClick={exportCSV}>Export CSV</Button>
+            <Button onClick={exportImage}>Export PNG</Button>
+            <Button disabled={downloading} onClick={() => download(['csv'])} data-testid="dl-csv">Download CSV</Button>
+            <Button disabled={downloading} onClick={() => download(['html'])} data-testid="dl-html">Download HTML</Button>
+            <Button disabled={downloading} onClick={() => download(['markdown'])} data-testid="dl-md">Download Markdown</Button>
+          </div>
         {downloading && (
           <div className="w-full text-xs text-gray-600" aria-label="download-progress">
             {progress !== null ? `Downloading… ${progress}%` : 'Downloading…'}
@@ -217,13 +221,18 @@ export default function MetricsBreakdownPage() {
         {dlError && (
           <div className="w-full text-xs text-red-600" role="alert">{dlError}</div>
         )}
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
-      <div className="mb-4 p-4 bg-white border rounded overflow-auto">
-        <BarChart data={chartData} threshold={turnPass} />
-      </div>
+      <Card className="mb-4 overflow-auto">
+        <CardContent>
+          <BarChart data={chartData} threshold={turnPass} />
+        </CardContent>
+      </Card>
 
-      <div className="p-4 bg-white border rounded overflow-auto">
+      <Card className="overflow-auto">
+        <CardContent>
         <table className="min-w-full text-sm">
           <thead>
             <tr className="text-left border-b">
@@ -250,7 +259,8 @@ export default function MetricsBreakdownPage() {
             ))}
           </tbody>
         </table>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

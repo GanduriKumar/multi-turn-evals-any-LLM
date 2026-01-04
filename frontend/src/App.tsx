@@ -9,6 +9,7 @@ import RunDashboardPage from './pages/RunDashboardPage'
 import MetricsBreakdownPage from './pages/MetricsBreakdownPage'
 import ConversationDetailPage from './pages/ConversationDetailPage'
 import RunComparisonPage from './pages/RunComparisonPage'
+import Layout from './components/layout/Layout'
 
  
 
@@ -17,19 +18,7 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="container mx-auto p-6 max-w-6xl">
-        <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Evaluator Workbench</h1>
-          <nav className="flex gap-4 text-blue-600">
-            <Link to="/datasets">Datasets</Link>
-            <Link to="/run-setup">Run Setup</Link>
-            <Link to="/dashboard/example">Dashboard</Link>
-            <Link to="/metrics/example">Metrics</Link>
-            <Link to="/compare?baseline=&current=">Compare</Link>
-            <Link to="/viewer">Run Viewer</Link>
-          </nav>
-        </header>
-
+      <Layout>
         <Routes>
           <Route path="/" element={<Navigate to="/datasets" replace />} />
           <Route path="/datasets" element={<DatasetsPage />} />
@@ -58,7 +47,7 @@ function App() {
             }
           />
         </Routes>
-      </div>
+      </Layout>
     </BrowserRouter>
   )
 }

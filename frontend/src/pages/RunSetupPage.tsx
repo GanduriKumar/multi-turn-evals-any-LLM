@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import Button from '../components/ui/Button'
 
 import type { DatasetInfo } from './DatasetsPage';
 
@@ -116,16 +118,23 @@ export default function RunSetupPage() {
   return (
     <div>
       {runId && (
-        <div className="mb-4 p-3 rounded bg-green-50 text-green-700 border border-green-200">
-          Run started successfully. Run ID: <strong>{runId}</strong>.{' '}
-          <Link className="underline" to={`/dashboard/${runId}`}>Open Dashboard</Link>
-        </div>
+        <Card className="mb-4 border-green-200">
+          <CardContent>
+            <div className="text-green-700">
+              Run started successfully. Run ID: <strong>{runId}</strong>.{' '}
+              <Link className="underline" to={`/dashboard/${runId}`}>Open Dashboard</Link>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <section className="lg:col-span-2 space-y-6">
-          <div className="border rounded p-4 bg-white">
-            <h2 className="font-semibold mb-3">Datasets</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Datasets</CardTitle>
+            </CardHeader>
+            <CardContent>
             {loading && <div>Loading…</div>}
             {error && <div className="text-red-600">{error}</div>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-64 overflow-auto pr-2">
@@ -144,10 +153,14 @@ export default function RunSetupPage() {
               ))}
             </div>
             <div className="text-sm text-gray-600 mt-2">Selected: {selectedCount}</div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="border rounded p-4 bg-white">
-            <h2 className="font-semibold mb-3">Model</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Model</CardTitle>
+            </CardHeader>
+            <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label htmlFor="provider" className="block text-sm font-medium">Provider</label>
@@ -179,10 +192,14 @@ export default function RunSetupPage() {
                 <input id="modelAlias" className="border rounded p-2 w-full" value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="Optional alias used in results" />
               </div>
             </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="border rounded p-4 bg-white">
-            <h2 className="font-semibold mb-3">Metrics</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
             <div className="flex flex-wrap gap-3 text-sm">
               {['core', 'safety', 'reasoning', 'hallucination'].map((m) => (
                 <label key={m} className="flex items-center gap-2 border px-3 py-1 rounded">
@@ -199,10 +216,14 @@ export default function RunSetupPage() {
                 </label>
               ))}
             </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="border rounded p-4 bg-white">
-            <h2 className="font-semibold mb-3">Truncation & Concurrency</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Truncation & Concurrency</CardTitle>
+            </CardHeader>
+            <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
                 <label htmlFor="trunc" className="block text-sm font-medium">Truncation</label>
@@ -232,32 +253,41 @@ export default function RunSetupPage() {
                 />
               </div>
             </div>
-          </div>
+            </CardContent>
+          </Card>
         </section>
 
         <aside className="space-y-4">
-          <div className="border rounded p-4 bg-white">
-            <h2 className="font-semibold mb-3">Summary</h2>
-            <div className="text-sm space-y-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm space-y-1">
               <div><strong>Datasets:</strong> {Object.values(selectedDatasets).filter(Boolean).length}</div>
               <div><strong>Provider:</strong> {provider}</div>
               <div><strong>Model:</strong> {model}</div>
               <div><strong>Bundles:</strong> {metricBundles.join(', ') || '—'}</div>
               <div><strong>Truncation:</strong> {truncStrategy}{truncStrategy !== 'none' ? ` (${truncTokens || '—'})` : ''}</div>
               <div><strong>Max workers:</strong> {maxWorkers}</div>
-            </div>
-            <button
-              className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
-              disabled={submitting || Object.values(selectedDatasets).every((v) => !v)}
-              onClick={submit}
-            >
-              {submitting ? 'Starting…' : 'Start Run'}
-            </button>
-          </div>
+              </div>
+              <Button
+                className="mt-4 w-full"
+                variant="primary"
+                disabled={submitting || Object.values(selectedDatasets).every((v) => !v)}
+                onClick={submit}
+              >
+                {submitting ? 'Starting…' : 'Start Run'}
+              </Button>
+            </CardContent>
+          </Card>
 
-          <div className="border rounded p-4 bg-white">
-            <h2 className="font-semibold mb-3">Run metadata</h2>
-            <div className="space-y-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Run metadata</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
               <div>
                 <label htmlFor="runName" className="block text-sm font-medium">Name</label>
                 <input id="runName" className="border rounded p-2 w-full" value={name} onChange={(e) => setName(e.target.value)} />
@@ -270,8 +300,9 @@ export default function RunSetupPage() {
                 <label htmlFor="runSeed" className="block text-sm font-medium">Random seed</label>
                 <input id="runSeed" className="border rounded p-2 w-full" type="number" value={seed} onChange={(e) => setSeed(e.target.value === '' ? '' : Number(e.target.value))} />
               </div>
-            </div>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </aside>
       </div>
     </div>

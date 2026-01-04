@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import Button from '../components/ui/Button'
 import { compareRuns } from '../utils/api'
 
 // Small helper for number formatting
@@ -71,12 +73,13 @@ export default function RunComparisonPage() {
           <div className="text-sm text-gray-600">Compare two runs and view deltas by dataset and metric.</div>
         </div>
         <div className="flex gap-2">
-          {baseline && <Link className="px-3 py-2 rounded border" to={`/dashboard/${baseline}`}>Baseline Dashboard</Link>}
-          {current && <Link className="px-3 py-2 rounded border" to={`/dashboard/${current}`}>Current Dashboard</Link>}
+          {baseline && <Button to={`/dashboard/${baseline}`}>Baseline Dashboard</Button>}
+          {current && <Button to={`/dashboard/${current}`}>Current Dashboard</Button>}
         </div>
       </div>
 
-      <div className="p-4 bg-white border rounded mb-4 grid gap-3 md:grid-cols-2">
+      <Card className="mb-4">
+        <CardContent className="grid gap-3 md:grid-cols-2">
         <label className="text-sm">
           <span className="text-gray-700">Baseline Run ID</span>
           <input className="mt-1 w-full border rounded p-2" value={baseline} onChange={(e) => setBaseline(e.target.value)} placeholder="run_a" />
@@ -86,9 +89,9 @@ export default function RunComparisonPage() {
           <input className="mt-1 w-full border rounded p-2" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="run_b" />
         </label>
         <div className="md:col-span-2 flex items-center gap-3">
-          <button className="px-3 py-2 rounded border" onClick={onCompare} disabled={!baseline || !current || loading}>
+          <Button onClick={onCompare} disabled={!baseline || !current || loading}>
             {loading ? 'Comparing…' : 'Compare'}
-          </button>
+          </Button>
           <label className="text-sm">
             <span className="text-gray-700">Filter Dataset</span>
             <select className="mt-1 border rounded p-2 ml-2" value={datasetFilter} onChange={(e) => setDatasetFilter(e.target.value)} aria-label="dataset-filter">
@@ -102,19 +105,23 @@ export default function RunComparisonPage() {
             </select>
           </label>
         </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {error && <div className="text-red-600 mb-3">{error}</div>}
 
       {data && (
         <>
-          <div className="p-4 bg-white border rounded mb-4">
+          <Card className="mb-4">
+            <CardContent>
             <div className="text-sm text-gray-700">Overall delta</div>
             <div className="text-lg">Baseline {fmt(data.summary.overall.baseline)} → Current {fmt(data.summary.overall.current)} (<span className={data.summary.overall.delta >= 0 ? 'text-green-700' : 'text-red-700'}>{fmt(data.summary.overall.delta)}</span>)</div>
             <div className="text-xs text-gray-500 mt-1">Common conversations: {data.summary.counts.conversations_common} · Baseline-only: {data.summary.counts.baseline_only} · Current-only: {data.summary.counts.current_only}</div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="p-4 bg-white border rounded mb-4 overflow-auto" data-testid="per-dataset-table">
+          <Card className="mb-4 overflow-auto" data-testid="per-dataset-table">
+            <CardContent>
             <h3 className="font-semibold mb-2">Per Dataset</h3>
             <table className="min-w-full text-sm">
               <thead>
@@ -136,9 +143,11 @@ export default function RunComparisonPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="p-4 bg-white border rounded mb-4 overflow-auto" data-testid="metrics-table">
+          <Card className="mb-4 overflow-auto" data-testid="metrics-table">
+            <CardContent>
             <h3 className="font-semibold mb-2">Metrics by Dataset</h3>
             <table className="min-w-full text-sm">
               <thead>
@@ -162,7 +171,8 @@ export default function RunComparisonPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </CardContent>
+          </Card>
         </>
       )}
     </div>

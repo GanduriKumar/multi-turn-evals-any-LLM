@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
+import Button from '../components/ui/Button'
 import { submitRunFeedback, type TurnFeedback } from '../utils/api';
 
 // Lightweight diff utility to highlight expected vs actual differences line-by-line
@@ -85,8 +87,8 @@ export default function ConversationDetailPage() {
           <div className="text-sm text-gray-600">Run: <code>{runId}</code> · Conversation: <code>{conversationId}</code> {modelName ? <>· Model: <code>{modelName}</code></> : null}</div>
         </div>
         <div className="flex gap-2">
-          <Link className="px-3 py-2 rounded border" to={`/dashboard/${runId}`}>Back to Dashboard</Link>
-          <Link className="px-3 py-2 rounded border" to={`/viewer`}>Viewer</Link>
+          <Button to={`/dashboard/${runId}`}>Back to Dashboard</Button>
+          <Button to={`/viewer`}>Viewer</Button>
         </div>
       </div>
 
@@ -94,7 +96,8 @@ export default function ConversationDetailPage() {
       {error && <div className="text-red-600">{error}</div>}
 
       {entries.map((entry, idx) => (
-        <div key={idx} className="mb-6 p-4 bg-white border rounded">
+        <Card key={idx} className="mb-6">
+          <CardContent>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-sm text-gray-600">Dataset: {entry.dataset_id} · Model: {entry.model_name}</div>
@@ -119,7 +122,8 @@ export default function ConversationDetailPage() {
               <TurnRow key={String(t.turn_id)} turn={t} datasetId={entry.dataset_id} modelName={entry.model_name} />
             ))}
           </div>
-        </div>
+          </CardContent>
+        </Card>
       ))}
     </div>
   );
