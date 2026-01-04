@@ -261,12 +261,12 @@ function TurnRow({ turn, datasetId, modelName }: { turn: any; datasetId: string;
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block text-sm">
             <span className="text-gray-700">Rating (0-5)</span>
-            <input className="mt-1 w-full border rounded p-2" type="number" min={0} max={5} step={0.5}
+            <input className="mt-1 w-full border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue" type="number" min={0} max={5} step={0.5}
               value={rating} onChange={(e) => setRating(e.target.value)} aria-label={`rating-${turn.turn_id}`} />
           </label>
           <label className="block text-sm">
             <span className="text-gray-700">Override Pass/Fail</span>
-            <select className="mt-1 w-full border rounded p-2" value={overridePass} onChange={(e) => setOverridePass(e.target.value)} aria-label={`override-${turn.turn_id}`}>
+            <select className="mt-1 w-full border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue bg-white" value={overridePass} onChange={(e) => setOverridePass(e.target.value)} aria-label={`override-${turn.turn_id}`}>
               <option value="">Select…</option>
               <option value="true">Pass</option>
               <option value="false">Fail</option>
@@ -274,11 +274,11 @@ function TurnRow({ turn, datasetId, modelName }: { turn: any; datasetId: string;
           </label>
           <label className="block text-sm md:col-span-2">
             <span className="text-gray-700">Notes</span>
-            <textarea className="mt-1 w-full border rounded p-2" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} aria-label={`notes-${turn.turn_id}`} />
+            <textarea className="mt-1 w-full border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} aria-label={`notes-${turn.turn_id}`} />
           </label>
           <label className="block text-sm md:col-span-2">
             <span className="text-gray-700">Override Score (0-1, optional)</span>
-            <input className="mt-1 w-full border rounded p-2" type="number" min={0} max={1} step={0.01}
+            <input className="mt-1 w-full border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue" type="number" min={0} max={1} step={0.01}
               value={overrideScore} onChange={(e) => setOverrideScore(e.target.value)} aria-label={`ovscore-${turn.turn_id}`} />
           </label>
         </div>

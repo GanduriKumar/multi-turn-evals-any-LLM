@@ -103,7 +103,7 @@ export default function DatasetsPage() {
           <div className="flex gap-4 items-end">
             <div>
               <label htmlFor="domain" className="block text-sm font-medium">Domain</label>
-              <select id="domain" className="border rounded p-2" value={domain} onChange={(e) => setDomain(e.target.value)}>
+              <select id="domain" className="border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue bg-white" value={domain} onChange={(e) => setDomain(e.target.value)}>
                 {domains.map((d) => (
                   <option key={d} value={d}>{d || 'All'}</option>
                 ))}
@@ -111,7 +111,7 @@ export default function DatasetsPage() {
             </div>
             <div>
               <label htmlFor="difficulty" className="block text-sm font-medium">Difficulty</label>
-              <select id="difficulty" className="border rounded p-2" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+              <select id="difficulty" className="border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue bg-white" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
                 {difficulties.map((d) => (
                   <option key={d} value={d}>{d || 'All'}</option>
                 ))}
@@ -142,7 +142,7 @@ export default function DatasetsPage() {
               <div className="flex items-start gap-3">
                 <input type="checkbox" checked={!!selected[d.id]} onChange={() => toggle(d.id)} className="mt-1"/>
                 <div className="flex-1">
-                  <CardTitle>{d.name}</CardTitle>
+                  <CardTitle className="text-slate-900">{d.name}</CardTitle>
                   <div className="text-xs text-gray-600">ID: {d.id}</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {(d.tags || []).map((t) => (

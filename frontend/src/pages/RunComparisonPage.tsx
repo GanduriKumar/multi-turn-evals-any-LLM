@@ -83,11 +83,11 @@ export default function RunComparisonPage() {
         <CardContent className="grid gap-3 md:grid-cols-2">
         <label className="text-sm">
           <span className="text-gray-700">Baseline Run ID</span>
-          <input className="mt-1 w-full border rounded p-2" value={baseline} onChange={(e) => setBaseline(e.target.value)} placeholder="run_a" />
+          <input className="mt-1 w-full border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue" value={baseline} onChange={(e) => setBaseline(e.target.value)} placeholder="run_a" />
         </label>
         <label className="text-sm">
           <span className="text-gray-700">Current Run ID</span>
-          <input className="mt-1 w-full border rounded p-2" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="run_b" />
+          <input className="mt-1 w-full border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="run_b" />
         </label>
         <div className="md:col-span-2 flex items-center gap-3">
           <Button onClick={onCompare} disabled={!baseline || !current || loading}>
@@ -95,13 +95,13 @@ export default function RunComparisonPage() {
           </Button>
           <label className="text-sm">
             <span className="text-gray-700">Filter Dataset</span>
-            <select className="mt-1 border rounded p-2 ml-2" value={datasetFilter} onChange={(e) => setDatasetFilter(e.target.value)} aria-label="dataset-filter">
+            <select className="mt-1 border border-slate-300 rounded p-2 ml-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue bg-white" value={datasetFilter} onChange={(e) => setDatasetFilter(e.target.value)} aria-label="dataset-filter">
               {allDatasets.map((d) => <option key={d} value={d}>{d || 'All'}</option>)}
             </select>
           </label>
           <label className="text-sm">
             <span className="text-gray-700">Filter Metric</span>
-            <select className="mt-1 border rounded p-2 ml-2" value={metricFilter} onChange={(e) => setMetricFilter(e.target.value)} aria-label="metric-filter">
+            <select className="mt-1 border border-slate-300 rounded p-2 ml-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue bg-white" value={metricFilter} onChange={(e) => setMetricFilter(e.target.value)} aria-label="metric-filter">
               {allMetrics.map((m) => <option key={m} value={m}>{m || 'All'}</option>)}
             </select>
           </label>

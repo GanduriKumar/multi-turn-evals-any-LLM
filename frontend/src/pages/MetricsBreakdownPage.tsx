@@ -182,7 +182,7 @@ export default function MetricsBreakdownPage() {
           <div className="flex flex-wrap gap-4 items-end">
         <div>
           <label htmlFor="metricSel" className="block text-sm font-medium">Metric</label>
-          <select id="metricSel" className="border rounded p-2" value={metric} onChange={(e) => setMetric(e.target.value)}>
+          <select id="metricSel" className="border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue bg-white" value={metric} onChange={(e) => setMetric(e.target.value)}>
             {['correctness','structured','constraints','adherence','consistency','hallucination','safety'].map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
@@ -190,7 +190,7 @@ export default function MetricsBreakdownPage() {
         </div>
         <div>
           <label htmlFor="convSel" className="block text-sm font-medium">Conversation</label>
-          <select id="convSel" className="border rounded p-2" value={conversationFilter} onChange={(e) => setConversationFilter(e.target.value)}>
+          <select id="convSel" className="border border-slate-300 rounded p-2 focus:outline-none focus:ring-1 focus:ring-google-blue focus:border-google-blue bg-white" value={conversationFilter} onChange={(e) => setConversationFilter(e.target.value)}>
             {conversations.map((c) => <option key={c} value={c}>{c || 'All'}</option>)}
           </select>
         </div>

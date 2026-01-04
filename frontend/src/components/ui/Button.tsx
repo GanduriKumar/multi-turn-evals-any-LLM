@@ -11,14 +11,14 @@ function cx(...classes: Array<string | undefined | false>) {
 function variantClasses(variant: Variant) {
   switch (variant) {
     case 'primary':
-      return 'bg-brand-500 text-white hover:bg-brand-600 shadow-sm'
+      return 'bg-google-blue text-white hover:bg-blue-700 shadow-sm'
     case 'secondary':
       return 'bg-slate-800 text-white hover:bg-slate-900 shadow-sm'
     case 'outline':
       return 'border border-slate-300 text-slate-700 bg-white hover:bg-slate-50'
     case 'danger':
       // Outline-style danger to match design image (Abort button)
-      return 'border border-red-300 text-red-600 bg-white hover:bg-red-50'
+      return 'border border-red-300 text-google-red bg-white hover:bg-red-50'
     default:
       return ''
   }
@@ -68,7 +68,7 @@ export default function Button(props: ButtonProps) {
   const classes = cx(
     variantClasses(variant),
     sizeClasses(size),
-    'disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
+    'disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-google-blue/30',
     className,
   )
 

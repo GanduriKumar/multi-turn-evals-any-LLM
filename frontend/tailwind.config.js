@@ -7,22 +7,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: '#edf5ff',
-          100: '#d8e9ff',
-          200: '#b0d2ff',
-          300: '#7fb7ff',
-          400: '#4a98ff',
-          500: '#2d7dff',
-          600: '#225fd6',
-          700: '#1a49a6',
-          800: '#153a85',
-          900: '#102a61',
+        // Google brand-inspired palette
+        google: {
+          blue:   '#1a73e8',
+          green:  '#188038',
+          yellow: '#f9ab00',
+          red:    '#d93025',
         },
         slate: {
           25: '#f9fbfc'
         }
       },
+      boxShadow: {
+        card: '0 1px 2px rgba(0,0,0,0.05), 0 1px 1px rgba(0,0,0,0.03)'
+      }
     },
   },
   plugins: [],

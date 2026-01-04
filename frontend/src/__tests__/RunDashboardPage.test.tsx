@@ -23,7 +23,8 @@ describe('RunDashboardPage', () => {
     expect(screen.getByText('Metrics Selection')).toBeInTheDocument();
     expect(screen.getByText('Run Control')).toBeInTheDocument();
     expect(screen.getByText('Turn Control')).toBeInTheDocument();
-    expect(screen.getByText('Turn Review')).toBeInTheDocument();
+    // Turn Review label is now part of a menu button text "Turn Review ▾"
+    expect(screen.getByRole('button', { name: /Turn Review/i })).toBeInTheDocument();
 
     // Check for specific content in panels
     expect(screen.getAllByText('Gemini 1.5 Pro')[0]).toBeInTheDocument();

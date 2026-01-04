@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import StatusMeter from '../components/ui/StatusMeter'
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -15,16 +16,41 @@ function StarRating({ rating }: { rating: number }) {
   )
 }
 
-function GradientProgressBar({ value }: { value: number }) {
+// Lightweight menu primitive for clickable ▾ buttons
+function Menu({ button, items, onSelect }: { button: (open:boolean)=>React.ReactNode; items: Array<{label:string; value:string}>; onSelect: (v:string)=>void }) {
+  const [open, setOpen] = useState(false)
   return (
-    <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-      <div className="h-full bg-gradient-to-r from-blue-400 to-yellow-300" style={{ width: `${value}%` }} />
+    <div className="relative inline-block text-left">
+      <div onClick={() => setOpen((v) => !v)}>{button(open)}</div>
+      {open && (
+        <div role="menu" className="absolute right-0 mt-1 w-48 rounded-md border border-slate-200 bg-white shadow-card z-10">
+          {items.map((it) => (
+            <button
+              key={it.value}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50"
+              onClick={() => { setOpen(false); onSelect(it.value) }}
+              role="menuitem"
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-export default function RunDashboardPage() {
+// Segmented status meter with labels and google colors
+// StatusMeter moved to reusable component
+
+export type RunDashboardProps = {
+  onRunAction?: (action: 'pause' | 'resume') => void
+  onAbortAction?: (action: 'abort' | 'abort_delete') => void
+}
+
+export default function RunDashboardPage({ onRunAction, onAbortAction }: RunDashboardProps = {}) {
   const { runId = '112' } = useParams();
+  const navigate = useNavigate();
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-6 bg-gray-50 min-h-screen font-sans text-slate-800">
@@ -51,7 +77,19 @@ export default function RunDashboardPage() {
                 <input type="checkbox" defaultChecked className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4" />
                 <CardTitle className="text-lg">Define Test Scenarios</CardTitle>
               </div>
-              <Button variant="outline" size="sm" className="text-xs">Edit Dataset</Button>
+              <Menu
+                button={(open) => (
+                  <Button variant="outline" size="sm" className="text-xs" aria-expanded={open} aria-haspopup="menu">Edit Dataset ▾</Button>
+                )}
+                items={[
+                  { label: 'Open Datasets', value: 'datasets' },
+                  { label: 'Open Run Setup', value: 'setup' },
+                ]}
+                onSelect={(v) => {
+                  if (v === 'datasets') navigate('/datasets')
+                  if (v === 'setup') navigate('/run-setup')
+                }}
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-slate-50 p-3 rounded-md border border-slate-100">
@@ -60,7 +98,19 @@ export default function RunDashboardPage() {
                     <div className="font-medium text-slate-700">Dataset: technical_support</div>
                     <div className="text-xs text-slate-500">Conversations: 25</div>
                   </div>
-                  <Button variant="outline" size="sm" className="text-xs bg-white h-7">Edit Dataset ▾</Button>
+                  <Menu
+                    button={(open) => (
+                      <Button variant="outline" size="sm" className="text-xs bg-white h-7" aria-expanded={open} aria-haspopup="menu">Edit Dataset ▾</Button>
+                    )}
+                    items={[
+                      { label: 'Open Datasets', value: 'datasets' },
+                      { label: 'Open Run Setup', value: 'setup' },
+                    ]}
+                    onSelect={(v) => {
+                      if (v === 'datasets') navigate('/datasets')
+                      if (v === 'setup') navigate('/run-setup')
+                    }}
+                  />
                 </div>
                 
                 <div className="space-y-3 mt-3">
@@ -92,7 +142,19 @@ export default function RunDashboardPage() {
                 </div>
                 <CardTitle className="text-lg">LLM Configuration</CardTitle>
               </div>
-              <Button variant="outline" size="sm" className="text-xs">Edit LLM ▸</Button>
+              <Menu
+                button={(open) => (
+                  <Button variant="outline" size="sm" className="text-xs" aria-expanded={open} aria-haspopup="menu">Edit LLM ▾</Button>
+                )}
+                items={[
+                  { label: 'Change Provider/Model', value: 'setup' },
+                  { label: 'Open Viewer', value: 'viewer' },
+                ]}
+                onSelect={(v) => {
+                  if (v === 'setup') navigate('/run-setup')
+                  if (v === 'viewer') navigate('/viewer')
+                }}
+              />
             </CardHeader>
             <CardContent>
               <div className="bg-slate-50 p-4 rounded-md border border-slate-100 flex justify-between items-center">
@@ -196,8 +258,20 @@ export default function RunDashboardPage() {
                 <CardTitle className="text-lg">Run Control</CardTitle>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="text-xs h-7">Pause ▾</Button>
-                <Button variant="danger" size="sm" className="text-xs h-7">Abort ▾</Button>
+                <Menu
+                  button={(open) => (
+                    <Button variant="outline" size="sm" className="text-xs h-7" aria-expanded={open} aria-haspopup="menu">Pause ▾</Button>
+                  )}
+                  items={[{label:'Pause Now',value:'pause'},{label:'Resume',value:'resume'}]}
+                  onSelect={(v) => { onRunAction?.(v as 'pause' | 'resume') }}
+                />
+                <Menu
+                  button={(open) => (
+                    <Button variant="danger" size="sm" className="text-xs h-7" aria-expanded={open} aria-haspopup="menu">Abort ▾</Button>
+                  )}
+                  items={[{label:'Abort Job',value:'abort'},{label:'Abort & Delete Artifacts',value:'abort_delete'}]}
+                  onSelect={(v) => { onAbortAction?.(v as 'abort' | 'abort_delete') }}
+                />
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -207,21 +281,31 @@ export default function RunDashboardPage() {
                     <span className="bg-blue-100 text-blue-700 text-xs font-bold px-1.5 py-0.5 rounded">1</span>
                     Running Tests <span className="animate-spin text-slate-400">↻</span>
                   </div>
-                  <GradientProgressBar value={85} />
+                  <StatusMeter segments={[
+                    { label: 'Queued', value: 10, color: 'yellow' },
+                    { label: 'Running', value: 60, color: 'blue' },
+                    { label: 'Done', value: 30, color: 'green' },
+                  ]} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 text-sm text-slate-700 mb-1">
                     <span className="bg-blue-100 text-blue-700 text-xs font-bold px-1.5 py-0.5 rounded">2</span>
                     Scoring Responses:
                   </div>
-                  <GradientProgressBar value={60} />
+                  <StatusMeter segments={[
+                    { label: 'Scoring', value: 70, color: 'blue' },
+                    { label: 'Saved', value: 30, color: 'green' },
+                  ]} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 text-sm text-slate-700 mb-1">
                     <span className="bg-blue-100 text-blue-700 text-xs font-bold px-1.5 py-0.5 rounded">3</span>
                     Evaluating Metrics:
                   </div>
-                  <GradientProgressBar value={40} />
+                  <StatusMeter segments={[
+                    { label: 'Eval', value: 40, color: 'blue' },
+                    { label: 'Done', value: 60, color: 'green' },
+                  ]} />
                 </div>
               </div>
             </CardContent>
@@ -231,7 +315,16 @@ export default function RunDashboardPage() {
           <Card>
             <div className="border-b border-gray-200">
               <div className="flex">
-                <button className="px-4 py-3 text-sm font-medium text-slate-800 border-b-2 border-slate-800 bg-slate-50">Turn Review</button>
+                <Menu
+                  button={(open) => (
+                    <button className="px-4 py-3 text-sm font-medium text-slate-800 border-b-2 border-slate-800 bg-slate-50" aria-expanded={open} aria-haspopup="menu">Turn Review ▾</button>
+                  )}
+                  items={[{label:'Open Viewer', value:'viewer'}, {label:'Metrics Breakdown', value:'metrics'}]}
+                  onSelect={(v) => {
+                    if (v === 'viewer') navigate('/viewer')
+                    if (v === 'metrics') navigate(`/metrics/${runId}`)
+                  }}
+                />
                 <button className="px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">Summary</button>
               </div>
             </div>
