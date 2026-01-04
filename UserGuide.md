@@ -128,7 +128,7 @@ configs/
 
 ### Load Datasets in the UI
 
-1. Go to the Datasets page (navbar → Datasets)
+1. Go to the Data page (navbar → Data)
 2. If you don’t see your dataset, click “Refresh”
 3. Filter using the Domain (tags) or Difficulty dropdowns
 4. Select one or more datasets:
@@ -273,7 +273,7 @@ Tips
 
 ## Monitoring Run Progress
 
-The Dashboard shows current status, a progress bar, and conversation cards.
+Access the Dashboard via the **Runs** menu item. The Dashboard shows current status, a progress bar, and conversation cards.
 
 What you’ll see
 
@@ -281,6 +281,7 @@ What you’ll see
 - % progress across conversations (nice progress bar)
 - A list of conversations with per-item progress
 - Buttons for “Cancel Run,” “Open Viewer,” and Artifact downloads
+- A “Download Report” button in the top header
 
 Click any conversation to open its detail page. There you can:
 
@@ -295,7 +296,7 @@ Click any conversation to open its detail page. There you can:
 
 The Metrics page helps you spot patterns quickly.
 
-1. Open Metrics (from Dashboard or navbar)
+1. Open Metrics (navbar → Metrics)
 2. Choose a metric (e.g., correctness, safety)
 3. Optionally filter to a single conversation
 4. Review the bar chart — each bar is a turn’s score
@@ -313,6 +314,8 @@ Exporting
 ## Downloading Reports and Artifacts
 
 From the Dashboard “Artifacts” section, download:
+
+(Note: A dedicated **Reports** page is also available in the navbar for future reporting features.)
 
 - Results (JSON): raw, detailed per-turn and per-conversation scores
 - Summary (JSON): quick overview of pass/fail and averages

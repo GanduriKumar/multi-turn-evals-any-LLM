@@ -1,5 +1,5 @@
-import React from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import React, { useState } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 function navClass({ isActive }: { isActive: boolean }) {
   return 'flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ' + 
@@ -26,7 +26,32 @@ function IconReports() {
   return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 }
 
+function Dropdown({ button, items, onSelect }: { button: (open:boolean)=>React.ReactNode; items: Array<{ label: string; value: string; disabled?: boolean }>; onSelect: (v:string)=>void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="relative inline-block text-left">
+      <div onClick={() => setOpen((v) => !v)}>{button(open)}</div>
+      {open && (
+        <div role="menu" className="absolute right-0 mt-1 w-56 rounded-md border border-slate-200 bg-white shadow-card z-20">
+          {items.map((it) => (
+            <button
+              key={it.value}
+              className={`w-full text-left px-3 py-2 text-sm ${it.disabled ? 'text-slate-400 cursor-default' : 'hover:bg-slate-50'}`}
+              onClick={() => { if (!it.disabled) { setOpen(false); onSelect(it.value) } }}
+              role="menuitem"
+              disabled={!!it.disabled}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function NavBar() {
+  const navigate = useNavigate()
   return (
     <header className="sticky top-0 z-20 bg-white border-b border-slate-200">
       <div className="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between">
@@ -42,18 +67,44 @@ export default function NavBar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
-          <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
+          <Dropdown
+            button={(open) => (
+              <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100" aria-expanded={open} aria-haspopup="menu" title="Quick menu">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              </button>
+            )}
+            items={[
+              { label: 'Datasets', value: 'datasets' },
+              { label: 'Run Setup', value: 'setup' },
+              { label: 'Runs', value: 'runs' },
+              { label: 'Metrics', value: 'metrics' },
+              { label: 'Reports', value: 'reports' },
+            ]}
+            onSelect={(v) => {
+              if (v === 'datasets') navigate('/datasets')
+              if (v === 'setup') navigate('/run-setup')
+              if (v === 'runs') navigate('/dashboard/example')
+              if (v === 'metrics') navigate('/metrics/example')
+              if (v === 'reports') navigate('/reports')
+            }}
+          />
+          <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100" title="Messages">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
           </button>
-          <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-          </button>
-          <div className="w-8 h-8 rounded-full bg-google-blue flex items-center justify-center text-white text-sm font-medium overflow-hidden">
-            <img src="https://ui-avatars.com/api/?name=User&background=0D8ABC&color=fff" alt="User" />
-          </div>
+          <Dropdown
+            button={(open) => (
+              <button className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100" aria-expanded={open} aria-haspopup="menu" title="Notifications">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+              </button>
+            )}
+            items={[
+              { label: 'No new notifications', value: 'none', disabled: true },
+              { label: 'Open Reports', value: 'reports' },
+            ]}
+            onSelect={(v) => {
+              if (v === 'reports') navigate('/reports')
+            }}
+          />
         </div>
       </div>
     </header>

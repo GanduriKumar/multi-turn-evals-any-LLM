@@ -51,6 +51,11 @@ export type RunDashboardProps = {
 export default function RunDashboardPage({ onRunAction, onAbortAction }: RunDashboardProps = {}) {
   const { runId = '112' } = useParams();
   const navigate = useNavigate();
+  const [currentTurn, setCurrentTurn] = useState(1);
+  const totalTurns = 5;
+  const prevTurn = () => setCurrentTurn((t) => Math.max(1, t - 1));
+  const nextTurn = () => setCurrentTurn((t) => Math.min(totalTurns, t + 1));
+  const [turnTab, setTurnTab] = useState<'review' | 'summary'>('review');
 
   return (
     <div className="p-8 max-w-[1600px] mx-auto space-y-6 bg-gray-50 min-h-screen font-sans text-slate-800">
@@ -98,19 +103,7 @@ export default function RunDashboardPage({ onRunAction, onAbortAction }: RunDash
                     <div className="font-medium text-slate-700">Dataset: technical_support</div>
                     <div className="text-xs text-slate-500">Conversations: 25</div>
                   </div>
-                  <Menu
-                    button={(open) => (
-                      <Button variant="outline" size="sm" className="text-xs bg-white h-7" aria-expanded={open} aria-haspopup="menu">Edit Dataset ▾</Button>
-                    )}
-                    items={[
-                      { label: 'Open Datasets', value: 'datasets' },
-                      { label: 'Open Run Setup', value: 'setup' },
-                    ]}
-                    onSelect={(v) => {
-                      if (v === 'datasets') navigate('/datasets')
-                      if (v === 'setup') navigate('/run-setup')
-                    }}
-                  />
+                  {/* header menu above handles editing */}
                 </div>
                 
                 <div className="space-y-3 mt-3">
@@ -183,10 +176,23 @@ export default function RunDashboardPage({ onRunAction, onAbortAction }: RunDash
                 <input type="checkbox" defaultChecked className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4" />
                 <CardTitle className="text-lg">Turn Control</CardTitle>
               </div>
+              <Menu
+                button={(open) => (
+                  <Button variant="outline" size="sm" className="text-xs" aria-expanded={open} aria-haspopup="menu">Options ▾</Button>
+                )}
+                items={[
+                  { label: 'Open Viewer', value: 'viewer' },
+                  { label: 'Metrics Breakdown', value: 'metrics' },
+                ]}
+                onSelect={(v) => {
+                  if (v === 'viewer') navigate('/viewer')
+                  if (v === 'metrics') navigate(`/metrics/${runId}`)
+                }}
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-slate-50 p-4 rounded-md border border-slate-100 space-y-4">
-                <div className="text-sm font-medium text-slate-500">Turn 1 of 5</div>
+                <div className="text-sm font-medium text-slate-500">Turn {currentTurn} of {totalTurns}</div>
                 
                 <div className="bg-white p-3 rounded border border-slate-100 shadow-sm flex justify-between items-start">
                   <div className="text-sm">
@@ -206,7 +212,7 @@ export default function RunDashboardPage({ onRunAction, onAbortAction }: RunDash
               </div>
               
               <div>
-                <Button variant="outline" size="sm" className="text-slate-600">← Previous Turn</Button>
+                <Button variant="outline" size="sm" className="text-slate-600" onClick={prevTurn} disabled={currentTurn === 1}>← Previous Turn</Button>
               </div>
             </CardContent>
           </Card>
@@ -223,7 +229,19 @@ export default function RunDashboardPage({ onRunAction, onAbortAction }: RunDash
                 <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
                 <CardTitle className="text-lg">Metrics Selection</CardTitle>
               </div>
-              <Button variant="outline" size="sm" className="text-xs">Edit Metrics</Button>
+              <Menu
+                button={(open) => (
+                  <Button variant="outline" size="sm" className="text-xs" aria-expanded={open} aria-haspopup="menu">Edit Metrics ▾</Button>
+                )}
+                items={[
+                  { label: 'Metrics Breakdown', value: 'metrics' },
+                  { label: 'Open Run Setup', value: 'setup' },
+                ]}
+                onSelect={(v) => {
+                  if (v === 'metrics') navigate(`/metrics/${runId}`)
+                  if (v === 'setup') navigate('/run-setup')
+                }}
+              />
             </CardHeader>
             <CardContent className="space-y-4">
               {[
@@ -313,46 +331,61 @@ export default function RunDashboardPage({ onRunAction, onAbortAction }: RunDash
 
           {/* Turn Review */}
           <Card>
+            <CardHeader className="pb-0">
+              <CardTitle className="text-lg">Turn Review</CardTitle>
+            </CardHeader>
             <div className="border-b border-gray-200">
               <div className="flex">
-                <Menu
-                  button={(open) => (
-                    <button className="px-4 py-3 text-sm font-medium text-slate-800 border-b-2 border-slate-800 bg-slate-50" aria-expanded={open} aria-haspopup="menu">Turn Review ▾</button>
-                  )}
-                  items={[{label:'Open Viewer', value:'viewer'}, {label:'Metrics Breakdown', value:'metrics'}]}
-                  onSelect={(v) => {
-                    if (v === 'viewer') navigate('/viewer')
-                    if (v === 'metrics') navigate(`/metrics/${runId}`)
-                  }}
-                />
-                <button className="px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">Summary</button>
+                <button
+                  className={`px-4 py-3 text-sm font-medium ${turnTab === 'review' ? 'text-slate-800 border-b-2 border-slate-800 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => setTurnTab('review')}
+                >
+                  Review
+                </button>
+                <button
+                  className={`px-4 py-3 text-sm font-medium ${turnTab === 'summary' ? 'text-slate-800 border-b-2 border-slate-800 bg-slate-50' : 'text-slate-500 hover:text-slate-700'}`}
+                  onClick={() => setTurnTab('summary')}
+                >
+                  Summary
+                </button>
               </div>
             </div>
             <CardContent className="pt-4">
-              <div className="text-sm font-medium text-slate-500 mb-3">Turn 1 of 5</div>
-              
-              <div className="flex gap-4 h-48">
-                <div className="flex-1 space-y-3 overflow-y-auto pr-2">
-                  <div className="bg-blue-50 p-2 rounded text-sm text-slate-700">
-                    <span className="text-blue-600 font-bold text-xs block mb-1">USER:</span>
-                    How do to the login page...
+              <div className="text-sm font-medium text-slate-500 mb-3">Turn {currentTurn} of {totalTurns}</div>
+
+              {turnTab === 'review' ? (
+                <div className="flex gap-4 h-48">
+                  <div className="flex-1 space-y-3 overflow-y-auto pr-2">
+                    <div className="bg-blue-50 p-2 rounded text-sm text-slate-700">
+                      <span className="text-blue-600 font-bold text-xs block mb-1">USER:</span>
+                      How do to the login page...
+                    </div>
+                    <div className="bg-white border border-slate-100 p-2 rounded text-sm text-slate-700">
+                      <span className="text-indigo-600 font-bold text-xs block mb-1">Gemini 1.5 Pro</span>
+                      (I can help with that! Please go to the <span className="text-green-600">login page.</span>) at the top of the site, click the <span className="text-red-500">"Forgot Password"</span>.
+                    </div>
                   </div>
-                  <div className="bg-white border border-slate-100 p-2 rounded text-sm text-slate-700">
-                    <span className="text-indigo-600 font-bold text-xs block mb-1">Gemini 1.5 Pro</span>
-                    (I can help with that! Please go to the <span className="text-green-600">login page.</span>) at the top of the site, click the <span className="text-red-500">"Forgot Password"</span>.
+                  <div className="flex-1">
+                    <textarea
+                      className="w-full h-full p-3 text-sm border border-slate-200 rounded resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Human Review Notes..."
+                    ></textarea>
                   </div>
                 </div>
-                <div className="flex-1">
-                  <textarea 
-                    className="w-full h-full p-3 text-sm border border-slate-200 rounded resize-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Human Review Notes..."
-                  ></textarea>
+              ) : (
+                <div className="text-sm text-slate-600">
+                  <div className="mb-2">Summary of Turn {currentTurn} metrics and outcomes.</div>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>Correctness: 0.87</li>
+                    <li>Constraints: Pass</li>
+                    <li>Notes: N/A</li>
+                  </ul>
                 </div>
-              </div>
+              )}
 
               <div className="flex justify-between mt-4 pt-4 border-t border-slate-100">
-                <Button variant="outline" size="sm">← Previous Turn</Button>
-                <Button variant="primary" size="sm">Next Turn &gt;</Button>
+                <Button variant="outline" size="sm" onClick={prevTurn} disabled={currentTurn === 1}>← Previous Turn</Button>
+                <Button variant="primary" size="sm" onClick={nextTurn} disabled={currentTurn === totalTurns}>Next Turn &gt;</Button>
               </div>
             </CardContent>
           </Card>
