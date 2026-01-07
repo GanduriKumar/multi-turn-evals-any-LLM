@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import Card from '../components/Card'
 import Button from '../components/Button'
-import { Select } from '../components/Form'
+import { Select, Checkbox } from '../components/Form'
 
  
 
@@ -102,10 +102,57 @@ export default function GoldenGeneratorPage() {
   const [difficulty, setDifficulty] = useState<'easy'|'medium'|'hard'>('easy')
   const [outcome, setOutcome] = useState<'ALLOW'|'DENY'|'PARTIAL'>('ALLOW')
   const [bundle, setBundle] = useState<{dataset: any, golden: any} | null>(null)
+  const [bundles, setBundles] = useState<Array<{dataset: any, golden: any}>>([])
+  const [combined, setCombined] = useState<{dataset:any, golden:any} | null>(null)
+  const [overwriteSave, setOverwriteSave] = useState(false)
+  const [savingMsg, setSavingMsg] = useState<string | null>(null)
+  const [savingErr, setSavingErr] = useState<string | null>(null)
 
   const generate = () => {
     const b = buildConversation(domain, difficulty, outcome)
     setBundle(b)
+    setBundles([])
+    setCombined(null)
+  }
+
+  const generateAll = () => {
+    const diffs: Array<'easy'|'medium'|'hard'> = ['easy', 'medium', 'hard']
+    const outs: Array<'ALLOW'|'DENY'|'PARTIAL'> = ['ALLOW', 'DENY', 'PARTIAL']
+    const all: Array<{dataset:any, golden:any}> = []
+    for (const d of diffs) {
+      for (const o of outs) {
+        all.push(buildConversation(domain, d, o))
+      }
+    }
+    setBundles(all)
+    setBundle(null)
+    setCombined(null)
+  }
+
+  const generateCombined = () => {
+    const diffs: Array<'easy'|'medium'|'hard'> = ['easy', 'medium', 'hard']
+    const outs: Array<'ALLOW'|'DENY'|'PARTIAL'> = ['ALLOW', 'DENY', 'PARTIAL']
+    const all: Array<{dataset:any, golden:any}> = []
+    for (const d of diffs) {
+      for (const o of outs) {
+        all.push(buildConversation(domain, d, o))
+      }
+    }
+    const combinedId = `${domain}-combined-coverage`
+    const ds = {
+      dataset_id: combinedId,
+      version: '1.0.0',
+      metadata: { domain, difficulty: 'mixed', tags: ['coverage','combined'] },
+      conversations: all.flatMap(b => b.dataset.conversations)
+    }
+    const gd = {
+      dataset_id: combinedId,
+      version: '1.0.0',
+      entries: all.flatMap(b => b.golden.entries)
+    }
+    setCombined({ dataset: ds, golden: gd })
+    setBundle(null)
+    setBundles([])
   }
 
   const download = (name: 'dataset'|'golden') => {
@@ -117,6 +164,54 @@ export default function GoldenGeneratorPage() {
     a.download = `${bundle[name].dataset_id}.${name}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const downloadFrom = (name: 'dataset'|'golden', item: {dataset:any, golden:any}) => {
+    const blob = new Blob([JSON.stringify(item[name], null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${item[name].dataset_id}.${name}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const savePair = async (pair: {dataset:any, golden:any}) => {
+    setSavingMsg(null); setSavingErr(null)
+    try {
+      const r = await fetch('/datasets/save', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ dataset: pair.dataset, golden: pair.golden, overwrite: overwriteSave, bump_version: false })
+      })
+      const js = await r.json()
+      if (!r.ok) throw new Error(js?.detail ? (typeof js.detail === 'string' ? js.detail : JSON.stringify(js.detail)) : 'Save failed')
+      setSavingMsg(`Saved ${js.dataset_id} v${js.version || pair.dataset.version}`)
+    } catch (e:any) {
+      setSavingErr(e.message || 'Save failed')
+    }
+  }
+
+  const saveAll = async () => {
+    setSavingMsg(null); setSavingErr(null)
+    try {
+      let ok = 0
+      for (const p of bundles) {
+        const r = await fetch('/datasets/save', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ dataset: p.dataset, golden: p.golden, overwrite: overwriteSave, bump_version: false })
+        })
+        if (!r.ok) {
+          const js = await r.json().catch(() => ({}))
+          throw new Error(js?.detail ? (typeof js.detail === 'string' ? js.detail : JSON.stringify(js.detail)) : `Save failed for ${p.dataset?.dataset_id}`)
+        }
+        ok += 1
+      }
+      setSavingMsg(`Saved ${ok} datasets to server`)
+    } catch (e:any) {
+      setSavingErr(e.message || 'Save failed')
+    }
   }
 
   return (
@@ -144,8 +239,13 @@ export default function GoldenGeneratorPage() {
             </Select>
           </label>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2 items-center">
           <Button variant="primary" onClick={generate}>Generate</Button>
+          <Button variant="primary" onClick={generateAll}>Generate 100% coverage</Button>
+          <Button variant="warning" onClick={generateCombined}>Generate combined (100%)</Button>
+          <label className="inline-flex items-center gap-2 ml-2 text-sm"><Checkbox checked={overwriteSave} onChange={e => setOverwriteSave((e.target as HTMLInputElement).checked)} /> Overwrite on save</label>
+          {savingMsg && <span className="text-sm text-success">{savingMsg}</span>}
+          {savingErr && <span className="text-sm text-danger">{savingErr}</span>}
         </div>
       </Card>
 
@@ -154,8 +254,44 @@ export default function GoldenGeneratorPage() {
           <div className="flex flex-wrap gap-2 mb-2">
             <Button variant="secondary" onClick={() => download('dataset')}>Download dataset.json</Button>
             <Button variant="secondary" onClick={() => download('golden')}>Download golden.json</Button>
+            <Button variant="success" onClick={() => savePair(bundle)}>Save to server</Button>
           </div>
           <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto max-h-80">{JSON.stringify(bundle, null, 2)}</pre>
+        </Card>
+      )}
+
+      {combined && (
+        <Card title="Combined (100%) Preview & Download">
+          <div className="flex flex-wrap gap-2 mb-2">
+            <Button variant="secondary" onClick={() => downloadFrom('dataset', combined)}>Download combined dataset.json</Button>
+            <Button variant="secondary" onClick={() => downloadFrom('golden', combined)}>Download combined golden.json</Button>
+            <Button variant="success" onClick={() => savePair(combined)}>Save combined to server</Button>
+          </div>
+          <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto max-h-80">{JSON.stringify(combined, null, 2)}</pre>
+        </Card>
+      )}
+
+      {bundles.length > 0 && (
+        <Card title={`Coverage Preview (${bundles.length})`}>
+          <div className="text-sm text-gray-700 mb-2">Domain: {domain} — Difficulties: easy, medium, hard — Outcomes: ALLOW, DENY, PARTIAL</div>
+          <div className="mb-3">
+            <Button variant="success" onClick={saveAll}>Save all to server</Button>
+          </div>
+          <div className="space-y-3">
+            {bundles.map((b, idx) => (
+              <div key={b.dataset.dataset_id || idx} className="rounded border border-gray-200 p-3">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="font-mono text-xs">{b.dataset.dataset_id}</span>
+                  <span className="text-xs text-gray-500">v{b.dataset.version}</span>
+                  <div className="grow" />
+                  <Button variant="secondary" onClick={() => downloadFrom('dataset', b)}>dataset.json</Button>
+                  <Button variant="secondary" onClick={() => downloadFrom('golden', b)}>golden.json</Button>
+                  <Button variant="success" onClick={() => savePair(b)}>save</Button>
+                </div>
+                <pre className="text-xs bg-gray-50 p-2 rounded overflow-auto max-h-48">{JSON.stringify(b, null, 2)}</pre>
+              </div>
+            ))}
+          </div>
         </Card>
       )}
     </div>

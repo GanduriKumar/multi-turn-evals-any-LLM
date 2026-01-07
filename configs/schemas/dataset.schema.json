@@ -12,7 +12,7 @@
       "required": ["domain", "difficulty"],
       "properties": {
         "domain": {"type": "string", "enum": ["commerce", "banking"]},
-        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard"]},
+        "difficulty": {"type": "string", "enum": ["easy", "medium", "hard", "mixed"]},
         "tags": {"type": "array", "items": {"type": "string"}},
         "task_type": {"type": "string"}
       }
