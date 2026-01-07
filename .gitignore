@@ -5,6 +5,7 @@ __pycache__/
 .Python
 
 # Distribution / packaging
+runs/
 build/
 develop-eggs/
 dist/

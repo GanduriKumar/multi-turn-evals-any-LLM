@@ -1,18 +1,11 @@
 import React, { useEffect, useState } from 'react'
+import Card from '../components/Card'
+import Button from '../components/Button'
 
 type Settings = {
   ollama_host: string | null
   gemini_enabled: boolean
   semantic_threshold: number
-}
-
-function Card({ title, children }: { title: string, children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-4 py-2 font-medium text-gray-800">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
 }
 
 export default function SettingsPage() {
@@ -73,7 +66,7 @@ export default function SettingsPage() {
               <input type="number" step="0.01" min={0} max={1} className="border rounded px-2 py-1 w-28" value={semThr} onChange={e => setSemThr(Number(e.target.value))} />
             </label>
             <div className="flex items-center gap-2">
-              <button onClick={save} disabled={saving} className="px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+              <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
               {msg && <span className="text-gray-700">{msg}</span>}
               {err && <span className="text-danger">{err}</span>}
             </div>

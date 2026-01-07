@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import Card from '../components/Card'
+import Button from '../components/Button'
 
 type DatasetItem = {
   dataset_id: string
@@ -9,15 +11,6 @@ type DatasetItem = {
   has_golden?: boolean
   valid?: boolean
   errors?: string[]
-}
-
-function Card({ title, children }: { title: string, children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-4 py-2 font-medium text-gray-800">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
 }
 
 export default function DatasetsPage() {
@@ -90,7 +83,7 @@ export default function DatasetsPage() {
             <span>Overwrite existing files</span>
           </label>
           <div className="flex items-center gap-2">
-            <button onClick={handleUpload} disabled={uploading} className="px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 disabled:opacity-50">{uploading ? 'Uploading…' : 'Upload'}</button>
+            <Button onClick={handleUpload} disabled={uploading}>{uploading ? 'Uploading…' : 'Upload'}</Button>
             {uploadMsg && <span className="text-sm text-gray-700 break-all">{uploadMsg}</span>}
           </div>
           <p className="text-xs text-gray-500">Files are validated server-side and saved into the backend datasets/ folder.</p>
@@ -99,7 +92,7 @@ export default function DatasetsPage() {
 
       <Card title="Datasets">
         <div className="mb-2 flex items-center gap-2">
-          <button onClick={fetchList} className="px-3 py-1.5 rounded border hover:bg-gray-50">Refresh</button>
+          <Button variant="secondary" onClick={fetchList}>Refresh</Button>
           {loading && <span className="text-sm text-gray-600">Loading…</span>}
           {error && <span className="text-sm text-danger">{error}</span>}
         </div>

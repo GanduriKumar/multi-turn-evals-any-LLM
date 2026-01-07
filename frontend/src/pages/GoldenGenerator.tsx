@@ -1,13 +1,8 @@
 import React, { useMemo, useState } from 'react'
+import Card from '../components/Card'
+import Button from '../components/Button'
 
-function Card({ title, children }: { title: string, children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-4 py-2 font-medium text-gray-800">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
-}
+ 
 
 type Domain = 'commerce' | 'banking'
 
@@ -149,15 +144,15 @@ export default function GoldenGeneratorPage() {
           </label>
         </div>
         <div className="mt-4">
-          <button onClick={generate} className="px-3 py-1.5 rounded bg-primary text-white hover:opacity-90">Generate</button>
+          <Button onClick={generate}>Generate</Button>
         </div>
       </Card>
 
       {bundle && (
         <Card title="Preview & Download">
           <div className="flex flex-wrap gap-2 mb-2">
-            <button onClick={() => download('dataset')} className="px-3 py-1.5 rounded border hover:bg-gray-50">Download dataset.json</button>
-            <button onClick={() => download('golden')} className="px-3 py-1.5 rounded border hover:bg-gray-50">Download golden.json</button>
+            <Button variant="secondary" onClick={() => download('dataset')}>Download dataset.json</Button>
+            <Button variant="secondary" onClick={() => download('golden')}>Download golden.json</Button>
           </div>
           <pre className="text-xs bg-gray-50 p-3 rounded overflow-auto max-h-80">{JSON.stringify(bundle, null, 2)}</pre>
         </Card>

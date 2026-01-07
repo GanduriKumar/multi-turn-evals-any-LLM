@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import Card from '../components/Card'
+import Button from '../components/Button'
 
 type RunListItem = {
   run_id: string
@@ -10,14 +12,7 @@ type RunListItem = {
 
 type RunResults = any
 
-function Card({ title, children }: { title: string, children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-4 py-2 font-medium text-gray-800">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
-}
+ 
 
 export default function ReportsPage() {
   const [runs, setRuns] = useState<RunListItem[]>([])
@@ -97,11 +92,11 @@ export default function ReportsPage() {
               <option key={r.run_id} value={r.run_id}>{r.run_id} — {r.dataset_id || '?'} — {r.model_spec || '?'}</option>
             ))}
           </select>
-          <button className="px-3 py-1.5 rounded border hover:bg-gray-50" onClick={loadRuns}>Refresh</button>
+          <Button variant="secondary" onClick={loadRuns}>Refresh</Button>
           <div className="grow" />
-          <button disabled={!runId} onClick={() => download('json')} className="px-3 py-1.5 rounded border hover:bg-gray-50 disabled:opacity-50">Download JSON</button>
-          <button disabled={!runId} onClick={() => download('csv')} className="px-3 py-1.5 rounded border hover:bg-gray-50 disabled:opacity-50">Download CSV</button>
-          <button disabled={!runId} onClick={() => download('html')} className="px-3 py-1.5 rounded border hover:bg-gray-50 disabled:opacity-50">Open Report</button>
+          <Button variant="ghost" disabled={!runId} onClick={() => download('json')}>Download JSON</Button>
+          <Button variant="ghost" disabled={!runId} onClick={() => download('csv')}>Download CSV</Button>
+          <Button variant="primary" disabled={!runId} onClick={() => download('html')}>Open Report</Button>
         </div>
       </Card>
 
@@ -178,7 +173,7 @@ export default function ReportsPage() {
                 <textarea className="mt-1 w-full h-24 text-xs border rounded p-2" placeholder="Evaluator notes" value={fbNotes} onChange={e => setFbNotes(e.target.value)} />
               </label>
               <div className="mt-2 flex items-center gap-2">
-                <button onClick={submitFeedback} className="px-3 py-1.5 rounded bg-primary text-white hover:opacity-90">Submit Feedback</button>
+                <Button onClick={submitFeedback}>Submit Feedback</Button>
                 {fbMsg && <span className="text-gray-700">{fbMsg}</span>}
                 {fbErr && <span className="text-danger">{fbErr}</span>}
               </div>

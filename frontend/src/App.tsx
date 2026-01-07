@@ -7,15 +7,7 @@ import SettingsPage from './pages/Settings'
 import GoldenGeneratorPage from './pages/GoldenGenerator'
 import MetricsPage from './pages/Metrics'
 import GoldenEditorPage from './pages/GoldenEditor'
-
-function Card({ title, children }: { title: string, children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-4 py-2 font-medium text-gray-800">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
-}
+import Card from './components/Card'
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -36,7 +28,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               { to: '/metrics', label: 'Metrics' },
               { to: '/golden-generator', label: 'Golden Generator' },
             ].map(link => (
-              <NavLink key={link.to} to={link.to} className={({isActive}) => `hover:text-primary ${isActive ? 'text-primary' : ''}`}>
+              <NavLink key={link.to} to={link.to} className={({isActive}) => `rounded px-2 py-1 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${isActive ? 'text-primary' : ''}`}>
                 {link.label}
               </NavLink>
             ))}

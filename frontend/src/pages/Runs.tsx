@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import Card from '../components/Card'
+import Button from '../components/Button'
 
 type DatasetItem = {
   dataset_id: string
@@ -27,15 +29,6 @@ type JobStatus = {
   total_conversations: number
   completed_conversations: number
   error?: string | null
-}
-
-function Card({ title, children }: { title: string, children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-4 py-2 font-medium text-gray-800">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
 }
 
 export default function RunsPage() {
@@ -164,9 +157,9 @@ export default function RunsPage() {
               <label className="inline-flex items-center gap-2"><input type="checkbox" checked={metricHallucination} onChange={e => setMetricHallucination(e.target.checked)} /> hallucination</label>
             </div>
 
-            <button onClick={startRun} disabled={starting || !datasetId} className="px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 disabled:opacity-50">
+            <Button onClick={startRun} disabled={starting || !datasetId}>
               {starting ? 'Starting…' : 'Start Run'}
-            </button>
+            </Button>
           </div>
         )}
       </Card>
@@ -182,7 +175,7 @@ export default function RunsPage() {
             </div>
             {status && (
               <>
-                <div className="h-2 w-full bg-gray-100 rounded">
+                <div className="h-2 w-full bg-primary/10 rounded">
                   <div className="h-2 rounded bg-primary" style={{ width: `${Math.round(status.progress_pct * 100)}%` }} />
                 </div>
                 <div className="text-xs text-gray-600">{status.completed_conversations} / {status.total_conversations} ({Math.round(status.progress_pct * 100)}%)</div>

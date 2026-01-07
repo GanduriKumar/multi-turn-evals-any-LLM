@@ -1,13 +1,8 @@
 import React, { useEffect, useState } from 'react'
+import Card from '../components/Card'
+import Button from '../components/Button'
 
-function Card({ title, children }: { title: string, children: React.ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-100 px-4 py-2 font-medium text-gray-800">{title}</div>
-      <div className="p-4">{children}</div>
-    </div>
-  )
-}
+ 
 
 type MetricCfg = { name: string, enabled: boolean, weight?: number, threshold?: number }
 
@@ -71,7 +66,7 @@ export default function MetricsPage() {
               </div>
             ))}
             <div className="flex items-center gap-2">
-              <button onClick={save} disabled={saving} className="px-3 py-1.5 rounded bg-primary text-white hover:opacity-90 disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+              <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
               {msg && <span className="text-gray-700">{msg}</span>}
               {err && <span className="text-danger">{err}</span>}
             </div>
