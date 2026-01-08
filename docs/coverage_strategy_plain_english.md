@@ -1,3 +1,37 @@
+## Basis of coverage (what we combine)
+
+We build coverage by combining business areas (domains) with customer behaviors. These tables are the basis of coverage.
+
+### Domains (business areas)
+
+| Domain | Short description |
+| --- | --- |
+| Product Discovery & Search | Finding products using search, filters, categories, and suggestions. |
+| Product Details & Content | The product page: title, images, specs, reviews, and availability info. |
+| Recommendations & Ranking | What items are suggested and in what order across pages and widgets. |
+| Pricing, Offers & Promotions | Prices, discounts, coupons, bundles, and how deals are shown. |
+| Cart Management | Adding/removing items, changing quantities, showing savings, cart rules. |
+| Checkout & Payments | Address entry, shipping options, taxes, payment methods, confirmation. |
+| Order Management | Viewing status, changing/canceling orders, reorders, invoices. |
+| Shipping & Delivery | Delivery promises, dates, fees, pickup options, tracking updates. |
+| Returns, Refunds & Exchanges | Policies and flows to return/exchange items and get refunds. |
+| Customer Support & Escalations | Help content, chat/phone support, and handoff to human agents. |
+| User Account & Preferences | Profiles, saved addresses/payments, wishlists, alerts, privacy settings. |
+| Trust, Safety & Fraud | Identity checks, fraud prevention, abuse controls, policy enforcement. |
+| Merchant / Seller Operations | Seller onboarding, catalog tools, inventory, pricing, order handling. |
+| System Awareness & Failure Handling | Outages, errors, fallbacks, and clear messaging during issues. |
+
+### Behaviors (how customers ask)
+
+| Behavior | Short description |
+| --- | --- |
+| Happy Path | Simple, straightforward request that should just work. |
+| Constraint-heavy Queries | Requests with many limits (price cap, brand, delivery date). |
+| Ambiguous Queries | Vague ask that needs clarification to proceed. |
+| Multi-turn Conversations | Back-and-forth dialog to gather details and converge on a solution. |
+| User Corrections | Customer changes or corrects earlier information mid-conversation. |
+| Adversarial/Trap Queries | Attempts to break rules, trick the system, or push policy limits. |
+
 # Why we have ~606 tests today, and a smarter plan (plain English)
 
 In 60 seconds

@@ -68,6 +68,14 @@ export default function RunsPage() {
   const pollRef = useRef<number | null>(null)
   const [recentRuns, setRecentRuns] = useState<RunListItem[]>([])
 
+  // Helper: order runs by newest first (chronological desc)
+  const orderRuns = (arr: RunListItem[]) =>
+    (arr || []).slice().sort((a, b) => {
+      const at = (typeof a.created_ts === 'number' && isFinite(a.created_ts)) ? a.created_ts! : 0
+      const bt = (typeof b.created_ts === 'number' && isFinite(b.created_ts)) ? b.created_ts! : 0
+      return bt - at
+    })
+
   // Helper: sync a single run row in Recent Runs from a JobStatus snapshot
   const syncRecentWithStatus = (s: JobStatus) => {
     if (!s) return
@@ -82,7 +90,7 @@ export default function RunsPage() {
       }
       if (idx >= 0) {
         const updated = { ...prev[idx], ...patch }
-        return [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)]
+        return orderRuns([...prev.slice(0, idx), updated, ...prev.slice(idx + 1)])
       }
       // If not present, add a minimal entry to top
       const minimal: RunListItem = {
@@ -93,7 +101,7 @@ export default function RunsPage() {
         created_ts: Date.now(),
         ...patch,
       }
-      return [minimal, ...prev]
+      return orderRuns([minimal, ...prev])
     })
   }
 
@@ -102,7 +110,7 @@ export default function RunsPage() {
       const r = await fetch('/runs')
       if (r.ok) {
         const runs = await r.json()
-        setRecentRuns(runs)
+        setRecentRuns(orderRuns(runs))
       }
     } catch {}
   }
@@ -135,7 +143,7 @@ export default function RunsPage() {
           const defaultModel = (v.openai_enabled ? `openai:${oai}` : (v.gemini_enabled ? `gemini:${gem}` : `ollama:${oll}`))
           setModelSpec(defaultModel)
         } catch {}
-        setRecentRuns(runs)
+        setRecentRuns(orderRuns(runs))
         setSemanticThreshold(Number(v.semantic_threshold) || 0.8)
         // Seed metric toggles from persisted settings.metrics if available
         const cfg = (s && s.metrics && Array.isArray(s.metrics.metrics)) ? s.metrics.metrics : null
@@ -211,10 +219,10 @@ export default function RunsPage() {
       // Seed recent runs with this new job if missing
       setRecentRuns(prev => {
         if (prev.some(r => r.run_id === body.run_id)) return prev
-        return [
-          { run_id: body.run_id, dataset_id: datasetId, model_spec: modelSpec, has_results: false, state: body.state, progress_pct: 0, job_id: body.job_id, stale: false },
+        return orderRuns([
+          { run_id: body.run_id, dataset_id: datasetId, model_spec: modelSpec, has_results: false, state: body.state, progress_pct: 0, job_id: body.job_id, stale: false, created_ts: Date.now() },
           ...prev,
-        ]
+        ])
       })
       // Begin polling
       pollRef.current = window.setInterval(async () => {
