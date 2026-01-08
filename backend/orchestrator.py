@@ -57,10 +57,11 @@ class JobRecord:
     error: Optional[str] = None
     _task: Optional[asyncio.Task] = None
     _cancel: bool = False
+    _pause: bool = False
 
 
 class Orchestrator:
-    def __init__(self, datasets_dir: Optional[Path] = None, runs_root: Optional[Path] = None) -> None:
+    def __init__(self, datasets_dir: Optional[Path] = None, runs_root: Optional[Path] = None, boot_id: Optional[str] = None) -> None:
         self.repo = DatasetRepository(datasets_dir)
         self.runs_root = Path(runs_root) if runs_root else Path(__file__).resolve().parents[1] / "runs"
         self.runs_root.mkdir(parents=True, exist_ok=True)
@@ -68,6 +69,7 @@ class Orchestrator:
         self._id_seq = 0
         self._runner = TurnRunner(self.runs_root)
         self._writer = RunArtifactWriter(self.runs_root)
+        self.boot_id = boot_id or "unknown"
 
     @staticmethod
     def parse_model_spec(model_spec: str) -> tuple[str, str]:
@@ -85,11 +87,85 @@ class Orchestrator:
         jr = JobRecord(job_id=job_id, run_id=run_id, config={"dataset_id": dataset_id, "model_spec": model_spec, **config})
         jr.total_conversations = len(ds.get("conversations", []))
         self.jobs[job_id] = jr
+        # persist initial job status
+        try:
+            self._writer.write_job_status(run_id, {
+                "job_id": job_id,
+                "run_id": run_id,
+                "state": jr.state,
+                "progress_pct": jr.progress_pct,
+                "total_conversations": jr.total_conversations,
+                "completed_conversations": jr.completed_conversations,
+                "error": None,
+                "boot_id": self.boot_id,
+            })
+        except Exception:
+            pass
         return jr
 
     def cancel(self, job_id: str) -> None:
         jr = self.jobs[job_id]
         jr._cancel = True
+        # surface intent immediately
+        jr.state = "cancelling"
+        jr.updated_at = _now_iso()
+        try:
+            self._writer.write_job_status(jr.run_id, {
+                "job_id": jr.job_id,
+                "run_id": jr.run_id,
+                "state": jr.state,
+                "progress_pct": jr.progress_pct,
+                "total_conversations": jr.total_conversations,
+                "completed_conversations": jr.completed_conversations,
+                "error": None,
+                "boot_id": self.boot_id,
+            })
+        except Exception:
+            pass
+
+    def pause(self, job_id: str) -> None:
+        jr = self.jobs[job_id]
+        if jr.state in ("succeeded", "failed", "cancelled") or (jr._task and jr._task.done()):
+            raise RuntimeError("cannot pause a completed job")
+        if jr.state == "paused":
+            return
+        jr._pause = True
+        jr.state = "paused"
+        jr.updated_at = _now_iso()
+        try:
+            self._writer.write_job_status(jr.run_id, {
+                "job_id": jr.job_id,
+                "run_id": jr.run_id,
+                "state": jr.state,
+                "progress_pct": jr.progress_pct,
+                "total_conversations": jr.total_conversations,
+                "completed_conversations": jr.completed_conversations,
+                "error": None,
+                "boot_id": self.boot_id,
+            })
+        except Exception:
+            pass
+
+    def resume(self, job_id: str) -> None:
+        jr = self.jobs[job_id]
+        if jr.state in ("succeeded", "failed", "cancelled") or (jr._task and jr._task.done()):
+            raise RuntimeError("cannot resume a completed job")
+        jr._pause = False
+        jr.state = "running"
+        jr.updated_at = _now_iso()
+        try:
+            self._writer.write_job_status(jr.run_id, {
+                "job_id": jr.job_id,
+                "run_id": jr.run_id,
+                "state": jr.state,
+                "progress_pct": jr.progress_pct,
+                "total_conversations": jr.total_conversations,
+                "completed_conversations": jr.completed_conversations,
+                "error": None,
+                "boot_id": self.boot_id,
+            })
+        except Exception:
+            pass
 
     async def run_job(self, job_id: str) -> JobRecord:
         jr = self.jobs[job_id]
@@ -97,6 +173,20 @@ class Orchestrator:
             return jr
         jr.state = "running"
         jr.updated_at = _now_iso()
+        # write running status
+        try:
+            self._writer.write_job_status(jr.run_id, {
+                "job_id": jr.job_id,
+                "run_id": jr.run_id,
+                "state": jr.state,
+                "progress_pct": jr.progress_pct,
+                "total_conversations": jr.total_conversations,
+                "completed_conversations": jr.completed_conversations,
+                "error": None,
+                "boot_id": self.boot_id,
+            })
+        except Exception:
+            pass
 
         try:
             ds = self.repo.get_dataset(jr.config["dataset_id"])
@@ -112,12 +202,132 @@ class Orchestrator:
                 if jr._cancel:
                     jr.state = "cancelled"
                     jr.updated_at = _now_iso()
+                    try:
+                        self._writer.write_job_status(jr.run_id, {
+                            "job_id": jr.job_id,
+                            "run_id": jr.run_id,
+                            "state": jr.state,
+                            "progress_pct": jr.progress_pct,
+                            "total_conversations": jr.total_conversations,
+                            "completed_conversations": jr.completed_conversations,
+                            "error": None,
+                            "boot_id": self.boot_id,
+                        })
+                    except Exception:
+                        pass
                     return jr
+                # Pause gate before each conversation and between turns
+                if jr._pause:
+                    jr.state = "paused"
+                    jr.updated_at = _now_iso()
+                    try:
+                        self._writer.write_job_status(jr.run_id, {
+                            "job_id": jr.job_id,
+                            "run_id": jr.run_id,
+                            "state": jr.state,
+                            "progress_pct": jr.progress_pct,
+                            "total_conversations": jr.total_conversations,
+                            "completed_conversations": jr.completed_conversations,
+                            "error": None,
+                            "boot_id": self.boot_id,
+                        })
+                    except Exception:
+                        pass
+                    # wait until unpaused or cancelled
+                    while jr._pause and not jr._cancel:
+                        await asyncio.sleep(0.3)
+                    if jr._cancel:
+                        jr.state = "cancelled"
+                        jr.updated_at = _now_iso()
+                        return jr
+                    jr.state = "running"
+                    jr.updated_at = _now_iso()
+                    try:
+                        self._writer.write_job_status(jr.run_id, {
+                            "job_id": jr.job_id,
+                            "run_id": jr.run_id,
+                            "state": jr.state,
+                            "progress_pct": jr.progress_pct,
+                            "total_conversations": jr.total_conversations,
+                            "completed_conversations": jr.completed_conversations,
+                            "error": None,
+                            "boot_id": self.boot_id,
+                        })
+                    except Exception:
+                        pass
                 conv_id = conv.get("conversation_id")
                 turns = conv.get("turns", [])
                 # iterate user turns only
                 for idx, t in enumerate(turns):
                     if t.get("role") == "user":
+                        # inner pause gate before each user turn
+                        if jr._cancel:
+                            jr.state = "cancelled"
+                            jr.updated_at = _now_iso()
+                            try:
+                                self._writer.write_job_status(jr.run_id, {
+                                    "job_id": jr.job_id,
+                                    "run_id": jr.run_id,
+                                    "state": jr.state,
+                                    "progress_pct": jr.progress_pct,
+                                    "total_conversations": jr.total_conversations,
+                                    "completed_conversations": jr.completed_conversations,
+                                    "error": None,
+                                    "boot_id": self.boot_id,
+                                })
+                            except Exception:
+                                pass
+                            return jr
+                        if jr._pause:
+                            jr.state = "paused"
+                            jr.updated_at = _now_iso()
+                            try:
+                                self._writer.write_job_status(jr.run_id, {
+                                    "job_id": jr.job_id,
+                                    "run_id": jr.run_id,
+                                    "state": jr.state,
+                                    "progress_pct": jr.progress_pct,
+                                    "total_conversations": jr.total_conversations,
+                                    "completed_conversations": jr.completed_conversations,
+                                    "error": None,
+                                    "boot_id": self.boot_id,
+                                })
+                            except Exception:
+                                pass
+                            while jr._pause and not jr._cancel:
+                                await asyncio.sleep(0.3)
+                            if jr._cancel:
+                                jr.state = "cancelled"
+                                jr.updated_at = _now_iso()
+                                try:
+                                    self._writer.write_job_status(jr.run_id, {
+                                        "job_id": jr.job_id,
+                                        "run_id": jr.run_id,
+                                        "state": jr.state,
+                                        "progress_pct": jr.progress_pct,
+                                        "total_conversations": jr.total_conversations,
+                                        "completed_conversations": jr.completed_conversations,
+                                        "error": None,
+                                        "boot_id": self.boot_id,
+                                    })
+                                except Exception:
+                                    pass
+                                return jr
+                            jr.state = "running"
+                            jr.updated_at = _now_iso()
+                            try:
+                                self._writer.write_job_status(jr.run_id, {
+                                    "job_id": jr.job_id,
+                                    "run_id": jr.run_id,
+                                    "state": jr.state,
+                                    "progress_pct": jr.progress_pct,
+                                    "total_conversations": jr.total_conversations,
+                                    "completed_conversations": jr.completed_conversations,
+                                    "error": None,
+                                    "boot_id": self.boot_id,
+                                })
+                            except Exception:
+                                pass
                         await self._runner.run_turn(
                             run_id=jr.run_id,
                             provider=provider,
@@ -130,6 +340,19 @@ class Orchestrator:
                 jr.completed_conversations += 1
                 jr.progress_pct = int(jr.completed_conversations * 100 / max(1, jr.total_conversations))
                 jr.updated_at = _now_iso()
+                try:
+                    self._writer.write_job_status(jr.run_id, {
+                        "job_id": jr.job_id,
+                        "run_id": jr.run_id,
+                        "state": jr.state,
+                        "progress_pct": jr.progress_pct,
+                        "total_conversations": jr.total_conversations,
+                        "completed_conversations": jr.completed_conversations,
+                        "error": None,
+                        "boot_id": self.boot_id,
+                    })
+                except Exception:
+                    pass
 
             # Aggregate results across conversations and write artifacts
             results: Dict[str, Any] = {
@@ -221,11 +444,37 @@ class Orchestrator:
             jr.state = "succeeded"
             jr.updated_at = _now_iso()
             jr.progress_pct = 100
+            try:
+                self._writer.write_job_status(jr.run_id, {
+                    "job_id": jr.job_id,
+                    "run_id": jr.run_id,
+                    "state": jr.state,
+                    "progress_pct": jr.progress_pct,
+                    "total_conversations": jr.total_conversations,
+                    "completed_conversations": jr.completed_conversations,
+                    "error": None,
+                    "boot_id": self.boot_id,
+                })
+            except Exception:
+                pass
             return jr
         except Exception as e:
             jr.state = "failed"
             jr.error = str(e)
             jr.updated_at = _now_iso()
+            try:
+                self._writer.write_job_status(jr.run_id, {
+                    "job_id": jr.job_id,
+                    "run_id": jr.run_id,
+                    "state": jr.state,
+                    "progress_pct": jr.progress_pct,
+                    "total_conversations": jr.total_conversations,
+                    "completed_conversations": jr.completed_conversations,
+                    "error": jr.error,
+                    "boot_id": self.boot_id,
+                })
+            except Exception:
+                pass
             return jr
 
     def start(self, job_id: str) -> None:

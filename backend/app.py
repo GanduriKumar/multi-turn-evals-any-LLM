@@ -74,7 +74,9 @@ app.add_middleware(
 # App state singletons
 RUNS_ROOT = Path(__file__).resolve().parents[1] / "runs"
 RUNS_ROOT.mkdir(parents=True, exist_ok=True)
-app.state.orch = Orchestrator(runs_root=RUNS_ROOT)
+import uuid
+BOOT_ID = str(uuid.uuid4())
+app.state.orch = Orchestrator(runs_root=RUNS_ROOT, boot_id=BOOT_ID)
 app.state.artifacts = RunArtifactWriter(RUNS_ROOT)
 app.state.reader = RunArtifactReader(RUNS_ROOT)
 app.state.reporter = Reporter(Path(__file__).resolve().parent / "templates")
@@ -91,6 +93,9 @@ class StartRunResponse(BaseModel):
     job_id: str
     run_id: str
     state: str
+
+class ControlBody(BaseModel):
+    action: str  # 'pause' | 'resume' | 'cancel'
 
 @app.get("/health", response_model=Health)
 async def health():
@@ -435,11 +440,78 @@ async def start_run(req: StartRunRequest):
     return StartRunResponse(job_id=jr.job_id, run_id=jr.run_id, state=jr.state)
 
 
+@app.post("/runs/{job_id}/control")
+async def control_run(job_id: str, body: ControlBody):
+    orch: Orchestrator = app.state.orch
+    jr = orch.jobs.get(job_id)
+    if not jr:
+        # Allow 'cancel' to mark a stale job as cancelled if persisted job.json exists
+        reader: RunArtifactReader = app.state.reader
+        for p in sorted(reader.layout.runs_root.iterdir()):
+            if not p.is_dir():
+                continue
+            jpath = p / "job.json"
+            if not jpath.exists():
+                continue
+            try:
+                obj = json.loads(jpath.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if obj.get("job_id") == job_id:
+                act = (body.action or '').lower()
+                if act in ('cancel','abort'):
+                    obj["state"] = "cancelled"
+                    obj["error"] = "cancelled by user after restart"
+                    jpath.write_text(json.dumps(obj, indent=2), encoding="utf-8")
+                    return obj
+                raise HTTPException(status_code=404, detail="job not running")
+        raise HTTPException(status_code=404, detail="job not found")
+    act = (body.action or '').lower()
+    try:
+        if act == 'pause':
+            orch.pause(job_id)
+        elif act == 'resume':
+            orch.resume(job_id)
+        elif act == 'cancel' or act == 'abort':
+            orch.cancel(job_id)
+        else:
+            raise HTTPException(status_code=400, detail="unknown action")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    # Return current job status snapshot
+    return {
+        "job_id": jr.job_id,
+        "run_id": jr.run_id,
+        "state": jr.state,
+        "progress_pct": jr.progress_pct,
+        "total_conversations": jr.total_conversations,
+        "completed_conversations": jr.completed_conversations,
+        "error": jr.error,
+    }
+
+
 @app.get("/runs/{job_id}/status")
 async def run_status(job_id: str):
     orch: Orchestrator = app.state.orch
     jr = orch.jobs.get(job_id)
     if not jr:
+        # Try to recover from persisted job status if the process lost in-memory job
+        # Search runs folder for a job.json containing this job_id
+        reader: RunArtifactReader = app.state.reader
+        for p in sorted(reader.layout.runs_root.iterdir()):
+            if not p.is_dir():
+                continue
+            try:
+                obj = json.loads((p / "job.json").read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if obj.get("job_id") == job_id:
+                # If the recorded boot_id differs from current, mark stale running states as failed
+                if obj.get("boot_id") != BOOT_ID and obj.get("state") in ("running", "paused", "cancelling"):
+                    obj = {**obj, "state": "failed", "error": "stale status from previous server session"}
+                return obj
         raise HTTPException(status_code=404, detail="job not found")
     return {
         "job_id": jr.job_id,
@@ -570,12 +642,26 @@ async def list_runs():
                 cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
         except Exception:
             cfg = {}
+        # Try to read persisted job status to enrich item
+        job_state = app.state.reader.read_job_status(run_id)
+        # Determine staleness
+        boot_id = (job_state or {}).get('boot_id')
+        is_stale = (boot_id is None) or (boot_id != BOOT_ID)
+        state_val = (job_state or {}).get('state')
+        # If stale and previously active, show 'stale'
+        if is_stale and state_val in ("running","paused","cancelling"):
+            state_val = "stale"
         items.append({
             'run_id': run_id,
             'dataset_id': cfg.get('dataset_id'),
             'model_spec': cfg.get('model_spec'),
             'has_results': res_path.exists(),
             'created_ts': cfg_path.stat().st_mtime if cfg_path.exists() else None,
+            'state': state_val,
+            'progress_pct': (job_state or {}).get('progress_pct'),
+            'completed_conversations': (job_state or {}).get('completed_conversations'),
+            'job_id': (job_state or {}).get('job_id'),
+            'stale': is_stale,
         })
     return items
 

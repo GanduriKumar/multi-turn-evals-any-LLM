@@ -61,6 +61,9 @@ class RunFolderLayout:
     def results_csv_path(self, run_id: str) -> Path:
         return self.run_dir(run_id) / "results.csv"
 
+    def job_status_path(self, run_id: str) -> Path:
+        return self.run_dir(run_id) / "job.json"
+
 
 class RunArtifactWriter:
     def __init__(self, runs_root: Path) -> None:
@@ -71,6 +74,11 @@ class RunArtifactWriter:
         path.write_text(json.dumps(config, indent=2), encoding="utf-8")
         # ensure conversations dir exists for turn artifacts
         self.layout.conversations_dir(run_id)
+        return path
+
+    def write_job_status(self, run_id: str, status: Dict[str, Any]) -> Path:
+        path = self.layout.job_status_path(run_id)
+        path.write_text(json.dumps(status, indent=2), encoding="utf-8")
         return path
 
     def write_results_json(self, run_id: str, results: Dict[str, Any]) -> Path:
@@ -141,3 +149,12 @@ class RunArtifactReader:
         path = self.layout.results_json_path(run_id)
         data = json.loads(path.read_text(encoding="utf-8"))
         return data
+
+    def read_job_status(self, run_id: str) -> Optional[Dict[str, Any]]:
+        p = self.layout.job_status_path(run_id)
+        if not p.exists():
+            return None
+        try:
+            return json.loads(p.read_text(encoding="utf-8"))
+        except Exception:
+            return None
