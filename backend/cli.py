@@ -8,6 +8,7 @@ from typing import List, Optional, Tuple
 try:
     from .orchestrator import Orchestrator
     from .schemas import SchemaValidator
+    from .reporter import Reporter
     from .coverage_builder import (
         build_per_behavior_datasets,
         build_domain_combined_datasets,
@@ -16,6 +17,7 @@ try:
 except ImportError:
     from backend.orchestrator import Orchestrator
     from backend.schemas import SchemaValidator
+    from backend.reporter import Reporter
     from backend.coverage_builder import (
         build_per_behavior_datasets,
         build_domain_combined_datasets,
@@ -130,6 +132,19 @@ def cmd_run(root: Path, file: Path) -> int:
             asyncio.run(orch.run_job(job.job_id))
             print(f"Run completed: job={job.job_id} state={job.state} run_id={job.run_id}")
             run_ids.append(job.run_id)
+            # Generate HTML report per run
+            try:
+                runs_dir = root / "runs" / job.run_id
+                results_path = runs_dir / "results.json"
+                if results_path.exists():
+                    results = json.loads(results_path.read_text(encoding="utf-8"))
+                    templates_dir = Path(__file__).resolve().parent / "templates"
+                    rep = Reporter(templates_dir)
+                    out_html = runs_dir / "report.html"
+                    rep.write_html(results, out_html)
+                    print(f"Report: {out_html}")
+            except Exception as e:
+                print(f"Report generation failed: {e}")
 
     print("All runs:", ", ".join(run_ids))
     return 0

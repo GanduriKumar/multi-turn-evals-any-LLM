@@ -35,19 +35,29 @@ class GeminiProvider:
                 max_output_tokens = int(p.get("max_tokens", max_output_tokens))
         except Exception:
             pass
+        # Build contents preserving roles and using systemInstruction for first system message
+        system_msg = None
+        contents = []
+        for m in req.messages:
+            role = (m.get("role") or "user").lower()
+            text = m.get("content", "")
+            if role == "system" and system_msg is None:
+                system_msg = {"role": "system", "parts": [{"text": text}]}
+                continue
+            if role == "assistant":
+                role = "model"  # Gemini expects 'model' for assistant messages
+            contents.append({"role": role, "parts": [{"text": text}]})
+
         payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": "\n".join([m.get("content", "") for m in req.messages])}]
-                }
-            ],
+            "contents": contents if contents else [{"role": "user", "parts": [{"text": ""}]}],
             "generationConfig": {
                 "temperature": temperature,
                 "topP": top_p,
                 "maxOutputTokens": max_output_tokens,
             }
         }
+        if system_msg is not None:
+            payload["systemInstruction"] = system_msg
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
                 r = await client.post(url, json=payload)
