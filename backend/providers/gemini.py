@@ -24,13 +24,29 @@ class GeminiProvider:
             return ProviderResponse(False, "", 0, {}, error="Gemini disabled: missing GOOGLE_API_KEY")
         t0 = time.perf_counter()
         url = GEMINI_API.format(model=req.model, key=self.api_key)
+        temperature = 0.2
+        top_p = 1.0
+        max_output_tokens = 512
+        try:
+            p = (req.metadata or {}).get("params")
+            if isinstance(p, dict):
+                temperature = float(p.get("temperature", temperature))
+                top_p = float(p.get("top_p", top_p))
+                max_output_tokens = int(p.get("max_tokens", max_output_tokens))
+        except Exception:
+            pass
         payload = {
             "contents": [
                 {
                     "role": "user",
                     "parts": [{"text": "\n".join([m.get("content", "") for m in req.messages])}]
                 }
-            ]
+            ],
+            "generationConfig": {
+                "temperature": temperature,
+                "topP": top_p,
+                "maxOutputTokens": max_output_tokens,
+            }
         }
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:

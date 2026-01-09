@@ -308,6 +308,7 @@ class Orchestrator:
                     except Exception:
                         pass
                 conv_id = conv.get("conversation_id")
+                conv_meta = (conv.get("metadata") or {}) if isinstance(conv.get("metadata"), dict) else {}
                 turns = conv.get("turns", [])
                 # iterate user turns only
                 for idx, t in enumerate(turns):
@@ -388,6 +389,7 @@ class Orchestrator:
                             conversation_id=conv_id,
                             turn_index=idx,
                             turns=turns[: idx + 1],
+                            conv_meta=conv_meta,
                         )
                 jr.completed_conversations += 1
                 jr.progress_pct = int(jr.completed_conversations * 100 / max(1, jr.total_conversations))

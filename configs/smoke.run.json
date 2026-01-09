@@ -1,0 +1,1 @@
+{"run_id":"smoke","datasets":["Orders & Returns-Refunds-v0.0.1"],"models":["ollama:llama3.2:latest"],"metrics":["exact","semantic","adherence","hallucination"],"thresholds":{"semantic":0.8}}

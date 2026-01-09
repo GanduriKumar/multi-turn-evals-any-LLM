@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Optional
+from .system_prompt import build_system_prompt, DEFAULT_PARAMS
 import json
 
 # very rough token estimator (~4 chars per token)
@@ -30,7 +31,7 @@ def _clip_text_to_tokens(text: str, max_tokens: int) -> Tuple[str, bool]:
     return clipped, True
 
 
-def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any], max_tokens: int = 2048) -> Dict[str, Any]:
+def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any], max_tokens: int = 2048, conv_meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Build provider-ready messages from state + last 4 turns with a simple token budget safeguard.
     Returns { messages: [...], audit: {...} }.
@@ -38,11 +39,28 @@ def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any
     # last 4 raw turns
     recent_turns = turns[-4:] if len(turns) > 4 else list(turns)
 
-    system_content = (
-        f"You are an assistant for {domain}. "
-        f"Use the following current state to answer succinctly and accurately.\n"
-        f"STATE={_render_state_summary(state)}"
-    )
+    # Try to pull policy+facts from conversation metadata if provided (new datasets)
+    cm = conv_meta or {}
+    policy = cm.get("policy_excerpt")
+    facts = cm.get("facts_bullets")
+    axes = cm.get("axes")
+    behavior = cm.get("behavior") or ""
+    sp = None
+    try:
+        if policy and facts and axes:
+            sp = build_system_prompt(domain=domain, behavior=behavior, axes=axes, policy_text=policy, facts_text=facts)
+    except Exception:
+        sp = None
+    if sp is not None:
+        system_content = sp.content + f"\nSTATE={_render_state_summary(state)}"
+        sys_params = dict(sp.params or {})
+    else:
+        system_content = (
+            f"You are an assistant for {domain}. "
+            f"Use the following current state to answer succinctly and accurately.\n"
+            f"STATE={_render_state_summary(state)}"
+        )
+        sys_params = dict(DEFAULT_PARAMS)
     messages = [{"role": "system", "content": system_content}]
 
     for t in recent_turns:
@@ -74,4 +92,4 @@ def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any
         "max_tokens": max_tokens,
     }
 
-    return {"messages": new_messages, "audit": audit}
+    return {"messages": new_messages, "audit": audit, "params": sys_params}

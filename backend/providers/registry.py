@@ -1,6 +1,34 @@
 from __future__ import annotations
 import os
 from typing import Dict
+from pathlib import Path
+
+# Load .env from repo root so CLI and scripts pick up API keys without starting the web app
+def _load_env_from_file() -> None:
+    try:
+        root = Path(__file__).resolve().parents[2]
+        env_path = root / '.env'
+        if env_path.exists():
+            try:
+                from dotenv import load_dotenv  # type: ignore
+                load_dotenv(env_path)
+                return
+            except Exception:
+                pass
+            # Fallback simple loader if python-dotenv is unavailable
+            for line in env_path.read_text(encoding='utf-8').splitlines():
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                k, v = line.split('=', 1)
+                k = k.strip(); v = v.strip()
+                if k and v and k not in os.environ:
+                    os.environ[k] = v
+    except Exception:
+        # non-fatal
+        pass
+
+_load_env_from_file()
 
 try:
     from .ollama import OllamaProvider

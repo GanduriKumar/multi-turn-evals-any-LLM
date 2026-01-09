@@ -15,10 +15,23 @@ class OllamaProvider:
     async def chat(self, req: ProviderRequest) -> ProviderResponse:
         t0 = time.perf_counter()
         url = f"{self.base_url}/api/chat"
+        temperature = 0.2
+        top_p = 1.0
+        try:
+            p = (req.metadata or {}).get("params")
+            if isinstance(p, dict):
+                temperature = float(p.get("temperature", temperature))
+                top_p = float(p.get("top_p", top_p))
+        except Exception:
+            pass
         payload = {
             "model": req.model,
             "messages": req.messages,
             "stream": False,
+            "options": {
+                "temperature": temperature,
+                "top_p": top_p,
+            }
         }
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:

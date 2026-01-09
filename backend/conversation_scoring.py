@@ -45,22 +45,22 @@ def aggregate_conversation(
 ) -> Dict[str, Any]:
     """
     Outcome-first rule: conversation passes only if final outcome passes and
-    no high-severity violations on the final turn (adherence/hallucination failures).
+    no high-severity violations on any assistant turn (adherence/hallucination failures).
 
     per_turn_results: list of {turn_index, metrics: {name: {pass: bool, ...}, ...}}
     """
     outcome = check_final_outcome(final_state, expected_outcome)
 
-    # Determine high-severity violations on final assistant turn if present
-    last = per_turn_results[-1] if per_turn_results else {"metrics": {}}
-    last_metrics = last.get("metrics", {})
+    # Determine high-severity violations on any assistant turn (A1 or A2)
     severe_fail = False
     sev_reasons: List[str] = []
-    for m in ("adherence", "hallucination"):
-        mres = last_metrics.get(m)
-        if isinstance(mres, dict) and mres.get("pass") is False:
-            severe_fail = True
-            sev_reasons.append(f"{m} failed on final turn")
+    for r in per_turn_results:
+        mets = r.get("metrics", {})
+        for m in ("adherence", "hallucination"):
+            mres = mets.get(m)
+            if isinstance(mres, dict) and mres.get("pass") is False:
+                severe_fail = True
+                sev_reasons.append(f"{m} failed on turn {r.get('turn_index')}")
 
     # Aggregate a simple weighted pass rate across turns using per-turn rollup if present,
     # else fallback to (exact.pass or semantic.pass)

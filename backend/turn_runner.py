@@ -43,14 +43,17 @@ class TurnRunner:
         conversation_id: str,
         turn_index: int,
         turns: List[Dict[str, str]],
+        conv_meta: Dict[str, Any] | None = None,
         max_tokens: int = 2048,
     ) -> Dict[str, Any]:
         started_at = self._now_iso()
         # 1) derive state from transcript
         state = extract_state(domain, turns)
         # 2) build provider-ready context
-        ctx = build_context(domain, turns, state, max_tokens=max_tokens)
+        # Build context with conversation-level metadata (policy + facts) when available
+        ctx = build_context(domain, turns, state, max_tokens=max_tokens, conv_meta=conv_meta or {})
         messages = ctx["messages"]
+        params = ctx.get("params") or {}
         # 3) call provider
         adapter = self.providers.get(provider)
         req = ProviderRequest(model=model, messages=messages, metadata={
@@ -58,6 +61,7 @@ class TurnRunner:
             "conversation_id": conversation_id,
             "turn_index": turn_index,
             "domain": domain,
+            "params": params,
         })
         resp = await adapter.chat(req)
         ended_at = self._now_iso()
