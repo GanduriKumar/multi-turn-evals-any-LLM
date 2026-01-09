@@ -3,6 +3,7 @@ import Card from '../components/Card'
 import Button from '../components/Button'
 import Badge from '../components/Badge'
 import { Select, Input, Textarea } from '../components/Form'
+import { useVertical } from '../context/VerticalContext'
 
 type RunListItem = {
   run_id: string
@@ -17,6 +18,7 @@ type RunResults = any
  
 
 export default function ReportsPage() {
+  const { vertical } = useVertical()
   const [runs, setRuns] = useState<RunListItem[]>([])
   const [runId, setRunId] = useState('')
   const [loading, setLoading] = useState(false)
@@ -33,7 +35,7 @@ export default function ReportsPage() {
   const loadRuns = async () => {
     setError(null)
     try {
-      const r = await fetch('/runs')
+      const r = await fetch(`/runs?vertical=${encodeURIComponent(vertical)}`)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const js = await r.json()
       setRuns(js)
@@ -46,7 +48,7 @@ export default function ReportsPage() {
   const loadResults = async (id: string) => {
     setLoading(true); setError(null)
     try {
-      const r = await fetch(`/runs/${id}/results`)
+      const r = await fetch(`/runs/${id}/results?vertical=${encodeURIComponent(vertical)}`)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const js = await r.json()
       setResults(js)
@@ -58,11 +60,11 @@ export default function ReportsPage() {
     }
   }
 
-  useEffect(() => { loadRuns() }, [])
-  useEffect(() => { if (runId) loadResults(runId) }, [runId])
+  useEffect(() => { loadRuns() }, [vertical])
+  useEffect(() => { if (runId) loadResults(runId) }, [runId, vertical])
 
   const download = (type: 'json' | 'csv' | 'html') => {
-    window.open(`/runs/${runId}/artifacts?type=${type}`, '_blank')
+    window.open(`/runs/${runId}/artifacts?type=${type}&vertical=${encodeURIComponent(vertical)}`, '_blank')
   }
 
   const submitFeedback = async () => {

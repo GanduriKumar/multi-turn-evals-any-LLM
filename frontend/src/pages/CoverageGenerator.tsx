@@ -3,6 +3,7 @@ import Card from '../components/Card'
 import Button from '../components/Button'
 import { Checkbox, Select } from '../components/Form'
 import { Input } from '../components/Form'
+import { useVertical } from '../context/VerticalContext'
 
 type Pair = {
   domain: string
@@ -13,6 +14,7 @@ type Pair = {
 }
 
 export default function CoverageGeneratorPage() {
+  const { vertical } = useVertical()
   const [domains, setDomains] = useState<string[]>([])
   const [behaviors, setBehaviors] = useState<string[]>([])
   const [selectedDomains, setSelectedDomains] = useState<string[]>([])
@@ -70,12 +72,13 @@ export default function CoverageGeneratorPage() {
         overwrite,
         domains: selectedDomains.length ? selectedDomains : undefined,
         behaviors: selectedBehaviors.length ? selectedBehaviors : undefined,
-        version: '1.0.0'
+        version: '1.0.0',
+        vertical,
       }
       const r = await fetch('/coverage/generate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       const js = await r.json()
       if (!r.ok) throw new Error(js?.detail || 'Generation failed')
-      if (js.saved) setMsg(`Saved ${js.files?.length || 0} dataset(s) to server`)
+      if (js.saved) setMsg(`Saved ${js.files?.length || 0} dataset(s) to server (vertical: ${vertical})`)
       else setMsg(`Generated ${js.outputs?.length || 0} dataset(s) (dry run)`) 
     } catch (e:any) {
       setErr(e.message || 'Generation failed')
@@ -112,7 +115,7 @@ export default function CoverageGeneratorPage() {
       const domains: string[] = Array.isArray(tj.domains) ? tj.domains : []
       const match = domains.find(d => slugify(d) === parsed.domainSlug)
       if (!match) throw new Error('Domain not found in taxonomy for dataset id.')
-      const body = { combined: true, dry_run: false, save: true, overwrite: true, domains: [match], version: parsed.version }
+      const body = { combined: true, dry_run: false, save: true, overwrite: true, domains: [match], version: parsed.version, vertical }
       const r = await fetch('/coverage/generate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       const js = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(js?.detail || `Generate HTTP ${r.status}`)
@@ -126,7 +129,7 @@ export default function CoverageGeneratorPage() {
 
   return (
     <div className="grid gap-4">
-      <Card title="Coverage Strategy (Server)">
+      <Card title="Dataset Generation Strategy (Server)">
         {covSettings ? (
           <div className="grid sm:grid-cols-3 gap-3 text-sm">
             <label className="flex items-center gap-2"><span className="w-32">Mode</span>
@@ -175,7 +178,7 @@ export default function CoverageGeneratorPage() {
           <div className="text-sm text-gray-600">Loading…</div>
         )}
       </Card>
-      <Card title="Coverage Generator">
+      <Card title="Dataset Generator">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
           <label className="flex items-center gap-2"><span className="w-28">Domains</span>
             <Select multiple value={selectedDomains} onChange={e => setSelectedDomains(Array.from(e.target.selectedOptions).map(o => o.value))} className="grow min-h-28">
@@ -216,7 +219,7 @@ export default function CoverageGeneratorPage() {
         </div>
       </Card>
 
-      <Card title="Coverage Preview">
+      <Card title="Dataset Coverage Preview">
         {!manifestPairs.length && <div className="text-sm text-gray-700">No selection yet. Click Preview coverage.</div>}
         {!!manifestPairs.length && (
           <div className="space-y-4">

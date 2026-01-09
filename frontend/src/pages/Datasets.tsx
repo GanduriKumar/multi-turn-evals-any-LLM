@@ -3,6 +3,7 @@ import Card from '../components/Card'
 import Button from '../components/Button'
 import Badge from '../components/Badge'
 import { Input, Select, Checkbox } from '../components/Form'
+import { useVertical } from '../context/VerticalContext'
 
 type DatasetItem = {
   dataset_id: string
@@ -16,6 +17,7 @@ type DatasetItem = {
 }
 
 export default function DatasetsPage() {
+  const { vertical } = useVertical()
   const [list, setList] = useState<DatasetItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +25,7 @@ export default function DatasetsPage() {
   const fetchList = async () => {
     setLoading(true); setError(null)
     try {
-      const r = await fetch('/datasets')
+      const r = await fetch(`/datasets?vertical=${encodeURIComponent(vertical)}`)
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       const js = await r.json()
       setList(js)
@@ -34,7 +36,7 @@ export default function DatasetsPage() {
     }
   }
 
-  useEffect(() => { fetchList() }, [])
+  useEffect(() => { fetchList() }, [vertical])
 
   const [fileDataset, setFileDataset] = useState<File | null>(null)
   const [fileGolden, setFileGolden] = useState<File | null>(null)
@@ -53,7 +55,7 @@ export default function DatasetsPage() {
       const fd = new FormData()
       fd.append('dataset', fileDataset)
       if (fileGolden) fd.append('golden', fileGolden)
-      const r = await fetch(`/datasets/upload?overwrite=${overwrite ? 'true' : 'false'}` , { method: 'POST', body: fd })
+      const r = await fetch(`/datasets/upload?overwrite=${overwrite ? 'true' : 'false'}&vertical=${encodeURIComponent(vertical)}` , { method: 'POST', body: fd })
       const ct = r.headers.get('content-type') || ''
       const body = ct.includes('application/json') ? await r.json() : await r.text()
       if (!r.ok) {
@@ -76,8 +78,8 @@ export default function DatasetsPage() {
     try {
       // fetch dataset and golden
       const [dsRes, gdRes] = await Promise.all([
-        fetch(`/datasets/${encodeURIComponent(datasetId)}`),
-        fetch(`/goldens/${encodeURIComponent(datasetId)}`)
+        fetch(`/datasets/${encodeURIComponent(datasetId)}?vertical=${encodeURIComponent(vertical)}`),
+        fetch(`/goldens/${encodeURIComponent(datasetId)}?vertical=${encodeURIComponent(vertical)}`)
       ])
       if (!dsRes.ok) throw new Error(`Dataset fetch failed (${dsRes.status})`)
       if (!gdRes.ok) throw new Error(`Golden fetch failed (${gdRes.status})`)

@@ -6,9 +6,28 @@ import ReportsPage from './pages/Reports'
 import SettingsPage from './pages/Settings'
 import GoldenGeneratorPage from './pages/GoldenGenerator'
 import MetricsPage from './pages/Metrics'
-import GoldenEditorPage from './pages/GoldenEditor'
+// Golden Editor disabled per scope
 import CoverageGeneratorPage from './pages/CoverageGenerator'
 import Card from './components/Card'
+import { VerticalProvider, useVertical } from './context/VerticalContext'
+
+function VerticalSelector() {
+  const { vertical, supported, setVertical, loading } = useVertical()
+  return (
+    <div className="flex items-center gap-2">
+      <span className="rounded-md px-2 py-1 font-medium bg-primary text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 text-sm">Vertical</span>
+      <select
+        className="border rounded px-2 py-1 text-sm"
+        value={vertical}
+        onChange={e => setVertical(e.target.value)}
+        disabled={loading}
+        title="Vertical"
+      >
+        {supported.map(v => <option key={v} value={v}>{v}</option>)}
+      </select>
+    </div>
+  )
+}
 
 function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -22,14 +41,14 @@ function Layout({ children }: { children: React.ReactNode }) {
             {(() => {
               type Color = 'primary' | 'success' | 'warning' | 'danger'
               const links: Array<{to: string, label: string, color: Color}> = [
-                { to: '/datasets', label: 'Datasets', color: 'success' },
+                // Move Dataset Generator to the first position
+                { to: '/coverage', label: 'Dataset Generator', color: 'warning' },
+                { to: '/datasets', label: 'Datasets Viewer', color: 'success' },
                 { to: '/runs', label: 'Runs', color: 'primary' },
                 { to: '/reports', label: 'Reports', color: 'warning' },
                 { to: '/settings', label: 'Settings', color: 'danger' },
-                { to: '/golden-editor', label: 'Golden Editor', color: 'success' },
                 { to: '/metrics', label: 'Metrics', color: 'primary' },
-                { to: '/golden-generator', label: 'Golden Generator', color: 'primary' },
-                { to: '/coverage', label: 'Coverage Generator', color: 'warning' },
+                // Golden Generator deprecated/hidden per scope
               ]
               const cls = (color: Color, _isActive: boolean) => {
                 const base = 'rounded-md px-2 py-1 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 transition'
@@ -51,6 +70,7 @@ function Layout({ children }: { children: React.ReactNode }) {
               ))
             })()}
           </nav>
+          <VerticalSelector />
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">
@@ -90,19 +110,19 @@ function Placeholder({ title }: { title: string }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<HomeCards/>} />
-          <Route path="/datasets" element={<DatasetsPage />} />
-          <Route path="/runs" element={<RunsPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/golden-editor" element={<GoldenEditorPage />} />
-          <Route path="/metrics" element={<MetricsPage />} />
-          <Route path="/golden-generator" element={<GoldenGeneratorPage />} />
-          <Route path="/coverage" element={<CoverageGeneratorPage />} />
-        </Routes>
-      </Layout>
+      <VerticalProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<HomeCards/>} />
+            <Route path="/datasets" element={<DatasetsPage />} />
+            <Route path="/runs" element={<RunsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/metrics" element={<MetricsPage />} />
+            <Route path="/coverage" element={<CoverageGeneratorPage />} />
+          </Routes>
+        </Layout>
+      </VerticalProvider>
     </BrowserRouter>
   )
 }

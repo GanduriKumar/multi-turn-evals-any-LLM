@@ -4,6 +4,7 @@ import Button from '../components/Button'
 import CircularProgress from '../components/CircularProgress'
 import Badge from '../components/Badge'
 import { Input, Select, Checkbox } from '../components/Form'
+import { useVertical } from '../context/VerticalContext'
 
 type DatasetItem = {
   dataset_id: string
@@ -49,6 +50,7 @@ type JobStatus = {
 }
 
 export default function RunsPage() {
+  const { vertical } = useVertical()
   const [datasets, setDatasets] = useState<DatasetItem[]>([])
   const [ver, setVer] = useState<VersionInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -111,7 +113,7 @@ export default function RunsPage() {
 
   const refreshRuns = async () => {
     try {
-      const r = await fetch('/runs')
+      const r = await fetch(`/runs?vertical=${encodeURIComponent(vertical)}`)
       if (r.ok) {
         const runs = await r.json()
         setRecentRuns(orderRuns(runs))
@@ -124,16 +126,16 @@ export default function RunsPage() {
       setLoading(true); setError(null)
       try {
         const [dR, vR, sR, rR] = await Promise.all([
-          fetch('/datasets'),
+          fetch(`/datasets?vertical=${encodeURIComponent(vertical)}`),
           fetch('/version'),
           fetch('/settings'),
-          fetch('/runs')
+          fetch(`/runs?vertical=${encodeURIComponent(vertical)}`)
         ])
         if (!dR.ok) throw new Error(`Datasets HTTP ${dR.status}`)
         if (!vR.ok) throw new Error(`Version HTTP ${vR.status}`)
         if (!sR.ok) throw new Error(`Settings HTTP ${sR.status}`)
         if (!rR.ok) throw new Error(`Runs HTTP ${rR.status}`)
-        const d = await dR.json()
+        const d = await dR.json() as DatasetItem[]
         const v = await vR.json() as VersionInfo & { models?: { ollama?: string; gemini?: string; openai?: string } }
         const s = await sR.json() as any
         const runs = await rR.json() as RunListItem[]
@@ -190,7 +192,7 @@ export default function RunsPage() {
     }
     load()
     return () => { if (pollRef.current) window.clearInterval(pollRef.current) }
-  }, [])
+  }, [vertical])
 
   const availableModels = useMemo(() => {
     const arr: { id: string; label: string }[] = []
@@ -218,6 +220,7 @@ export default function RunsPage() {
         model_spec: modelSpec,
         metrics,
         thresholds: { semantic_threshold: semanticThreshold, hallucination_threshold: hallucinationThreshold },
+        context: { vertical },
       }
       const r = await fetch('/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       const body = await r.json()
@@ -300,7 +303,7 @@ export default function RunsPage() {
         throw new Error(b?.detail || `Generate HTTP ${r.status}`)
       }
       // refresh datasets list
-      const dR = await fetch('/datasets')
+      const dR = await fetch(`/datasets?vertical=${encodeURIComponent(vertical)}`)
       if (dR.ok) {
         const d = await dR.json()
         setDatasets(d)
@@ -369,14 +372,7 @@ export default function RunsPage() {
               </label>
             </div>
 
-            {/* Regenerate (optimized) action */}
-            <div className="flex items-center gap-3">
-              <Button onClick={regenerateOptimized} disabled={!datasetId || regenLoading}>
-                {regenLoading ? 'Regenerating…' : 'Regenerate (optimized)'}
-              </Button>
-              <span className="text-xs text-gray-600">Uses current optimization strategy (configs/coverage.json)</span>
-            </div>
-            {regenMsg && <div className="text-xs {regenLoading ? 'text-gray-600' : 'text-gray-700'}">{regenMsg}</div>}
+            {/* Regenerate (optimized) action removed per scope */}
 
             <div className="flex flex-wrap gap-4">
               <label className="inline-flex items-center gap-2"><Checkbox checked={metricExact} onChange={e => setMetricExact((e.target as HTMLInputElement).checked)} /> exact</label>

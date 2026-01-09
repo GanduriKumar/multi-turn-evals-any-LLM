@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Any, Dict, Optional
 import os
 from pathlib import Path
@@ -70,6 +70,7 @@ class VersionInfo(BaseModel):
     openai_enabled: bool | None = None
     models: dict[str, str] | None = None
     hallucination_threshold: float | None = None
+    industry_vertical: str | None = None
 
 
 class SettingsBody(BaseModel):
@@ -83,6 +84,10 @@ class SettingsBody(BaseModel):
     openai_model: Optional[str] = None
     embed_model: Optional[str] = None
     metrics: Optional[Dict[str, Any]] = None  # persisted UI toggles
+    industry_vertical: Optional[str] = None
+
+
+SUPPORTED_VERTICALS = ["commerce", "banking", "finance", "healthcare"]
 
 
 def get_settings():
@@ -96,6 +101,7 @@ def get_settings():
     gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-5.1")
     embed_model = os.getenv("EMBED_MODEL", "nomic-embed-text")
+    industry_vertical = os.getenv("INDUSTRY_VERTICAL", "commerce")
     # Load persisted metrics config if present
     root = Path(__file__).resolve().parents[1]
     cfg_path = root / 'configs' / 'metrics.json'
@@ -114,6 +120,7 @@ def get_settings():
         "METRICS_CFG": metrics_cfg,
         "DEFAULT_MODELS": {"ollama": ollama_model, "gemini": gemini_model, "openai": openai_model},
         "EMBED_MODEL": embed_model,
+        "INDUSTRY_VERTICAL": industry_vertical,
     }
 
 app = FastAPI(title="LLM Eval Backend", version=APP_VERSION)
@@ -127,18 +134,124 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# App state singletons
-RUNS_ROOT = Path(__file__).resolve().parents[1] / "runs"
-RUNS_ROOT.mkdir(parents=True, exist_ok=True)
+# App state singletons (vertical-aware)
+RUNS_BASE = Path(__file__).resolve().parents[1] / "runs"
+RUNS_BASE.mkdir(parents=True, exist_ok=True)
 import uuid
 BOOT_ID = str(uuid.uuid4())
-app.state.orch = Orchestrator(runs_root=RUNS_ROOT, boot_id=BOOT_ID)
-app.state.artifacts = RunArtifactWriter(RUNS_ROOT)
-app.state.reader = RunArtifactReader(RUNS_ROOT)
+
+# Per-vertical contexts { vertical: { 'orch', 'artifacts', 'reader' } }
+app.state.vctx: dict[str, dict[str, Any]] = {}
 app.state.reporter = Reporter(Path(__file__).resolve().parent / "templates")
+
+def _ensure_vertical_name(name: Optional[str]) -> str:
+    v = (name or os.getenv("INDUSTRY_VERTICAL") or "commerce").lower()
+    if v not in SUPPORTED_VERTICALS:
+        v = "commerce"
+    return v
+
+def _get_or_create_vertical_context(vertical: Optional[str] = None) -> dict[str, Any]:
+    v = _ensure_vertical_name(vertical)
+    if v in app.state.vctx:
+        return app.state.vctx[v]
+    # Back-compat: if tests or callers set app.state.orch directly, adopt it for this vertical
+    try:
+        legacy_orch = getattr(app.state, 'orch', None)
+    except Exception:
+        legacy_orch = None
+    if legacy_orch is not None:
+        try:
+            runs_root = legacy_orch.runs_root
+        except Exception:
+            runs_root = RUNS_BASE / v
+            runs_root.mkdir(parents=True, exist_ok=True)
+        ctx = {
+            "orch": legacy_orch,
+            "artifacts": RunArtifactWriter(runs_root),
+            "reader": RunArtifactReader(runs_root),
+            "vertical": v,
+        }
+        app.state.vctx[v] = ctx
+        return ctx
+    root = Path(__file__).resolve().parents[1]
+    datasets_root = root / "datasets" / v
+    datasets_root.mkdir(parents=True, exist_ok=True)
+    runs_root = RUNS_BASE / v
+    runs_root.mkdir(parents=True, exist_ok=True)
+    orch = Orchestrator(datasets_dir=datasets_root, runs_root=runs_root, boot_id=BOOT_ID)
+    ctx = {
+        "orch": orch,
+        "artifacts": RunArtifactWriter(runs_root),
+        "reader": RunArtifactReader(runs_root),
+        "vertical": v,
+    }
+    app.state.vctx[v] = ctx
+    return ctx
+
+def _iter_all_contexts() -> list[dict[str, Any]]:
+    # Ensure at least default exists
+    _get_or_create_vertical_context(os.getenv("INDUSTRY_VERTICAL", "commerce"))
+    return list(app.state.vctx.values())
+
+def _migrate_legacy_assets():
+    """Move legacy datasets/runs at root into 'commerce' vertical folders once."""
+    root = Path(__file__).resolve().parents[1]
+    # datasets
+    ds_root = root / "datasets"
+    commerce_ds = ds_root / "commerce"
+    try:
+        commerce_ds.mkdir(parents=True, exist_ok=True)
+        moved_any = False
+        # move arrays folder if at root
+        arrays_src = ds_root / "arrays"
+        arrays_dst = commerce_ds / "arrays"
+        if arrays_src.exists() and arrays_src.is_dir() and not arrays_dst.exists():
+            try:
+                arrays_dst.parent.mkdir(parents=True, exist_ok=True)
+                arrays_src.rename(arrays_dst)
+                moved_any = True
+            except Exception:
+                pass
+        for p in ds_root.glob("*.dataset.json"):
+            try:
+                p.rename(commerce_ds / p.name)
+                moved_any = True
+            except Exception:
+                pass
+        for p in ds_root.glob("*.golden.json"):
+            try:
+                p.rename(commerce_ds / p.name)
+                moved_any = True
+            except Exception:
+                pass
+    except Exception:
+        pass
+    # runs
+    runs_root = root / "runs"
+    commerce_runs = runs_root / "commerce"
+    try:
+        commerce_runs.mkdir(parents=True, exist_ok=True)
+        for p in sorted(runs_root.iterdir()):
+            if not p.is_dir():
+                continue
+            if p.name in SUPPORTED_VERTICALS:
+                continue
+            # Heuristic: run folder contains job.json or run_config.json
+            if (p / "job.json").exists() or (p / "run_config.json").exists():
+                try:
+                    p.rename(commerce_runs / p.name)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+# Initialize default vertical context and migrate once
+_migrate_legacy_assets()
+_get_or_create_vertical_context(os.getenv("INDUSTRY_VERTICAL", "commerce"))
 
 
 class StartRunRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     dataset_id: str
     model_spec: str  # e.g., "ollama:llama3.2:latest" or "gemini:gemini-2.5"
     metrics: Optional[list[str]] = None
@@ -168,6 +281,7 @@ async def version():
         openai_enabled=bool(s.get("OPENAI_API_KEY")),
         models=s.get("DEFAULT_MODELS"),
         hallucination_threshold=s.get("HALLUCINATION_THRESHOLD"),
+        industry_vertical=s.get("INDUSTRY_VERTICAL"),
     )
 
 
@@ -183,6 +297,8 @@ async def get_settings_api():
         "metrics": s.get("METRICS_CFG"),
         "models": s.get("DEFAULT_MODELS"),
         "embed_model": s.get("EMBED_MODEL"),
+        "industry_vertical": s.get("INDUSTRY_VERTICAL"),
+        "supported_verticals": SUPPORTED_VERTICALS,
     }
 
 
@@ -221,6 +337,10 @@ async def update_settings_api(body: SettingsBody):
         env['OPENAI_MODEL'] = body.openai_model
     if body.embed_model is not None:
         env['EMBED_MODEL'] = body.embed_model
+    if body.industry_vertical is not None and isinstance(body.industry_vertical, str):
+        v = body.industry_vertical.lower()
+        if v in SUPPORTED_VERTICALS:
+            env['INDUSTRY_VERTICAL'] = v
     # Write
     lines = [f"{k}={v}" for k, v in env.items()]
     env_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
@@ -234,6 +354,10 @@ async def update_settings_api(body: SettingsBody):
     if 'GEMINI_MODEL' in env: os.environ['GEMINI_MODEL'] = env['GEMINI_MODEL']
     if 'OPENAI_MODEL' in env: os.environ['OPENAI_MODEL'] = env['OPENAI_MODEL']
     if 'EMBED_MODEL' in env: os.environ['EMBED_MODEL'] = env['EMBED_MODEL']
+    if 'INDUSTRY_VERTICAL' in env:
+        os.environ['INDUSTRY_VERTICAL'] = env['INDUSTRY_VERTICAL']
+        # Pre-create vertical context so subsequent calls use the updated selection
+        _get_or_create_vertical_context(env['INDUSTRY_VERTICAL'])
     return {"ok": True}
 
 
@@ -258,17 +382,19 @@ async def embeddings_test():
 
 
 @app.get("/datasets")
-async def list_datasets():
-    repo: DatasetRepository = app.state.orch.repo
+async def list_datasets(vertical: Optional[str] = None):
+    ctx = _get_or_create_vertical_context(vertical)
+    repo: DatasetRepository = ctx['orch'].repo
     return repo.list_datasets()
 
 
 @app.post("/datasets/upload")
-async def upload_dataset(dataset: UploadFile = File(...), golden: Optional[UploadFile] = File(None), overwrite: bool = False):
+async def upload_dataset(dataset: UploadFile = File(...), golden: Optional[UploadFile] = File(None), overwrite: bool = False, vertical: Optional[str] = None):
     """Upload a dataset (.dataset.json) and optional golden (.golden.json).
     Validates against schemas and writes to the datasets folder.
     """
-    repo: DatasetRepository = app.state.orch.repo
+    ctx = _get_or_create_vertical_context(vertical)
+    repo: DatasetRepository = ctx['orch'].repo
     datasets_dir: Path = repo.root_dir
     datasets_dir.mkdir(parents=True, exist_ok=True)
 
@@ -326,8 +452,9 @@ async def upload_dataset(dataset: UploadFile = File(...), golden: Optional[Uploa
 
 
 @app.get("/datasets/{dataset_id}")
-async def get_dataset_by_id(dataset_id: str):
-    repo: DatasetRepository = app.state.orch.repo
+async def get_dataset_by_id(dataset_id: str, vertical: Optional[str] = None):
+    ctx = _get_or_create_vertical_context(vertical)
+    repo: DatasetRepository = ctx['orch'].repo
     try:
         data = repo.get_dataset(dataset_id)
     except Exception as e:
@@ -336,9 +463,10 @@ async def get_dataset_by_id(dataset_id: str):
 
 
 @app.get("/goldens/{dataset_id}")
-async def get_golden_by_dataset(dataset_id: str):
+async def get_golden_by_dataset(dataset_id: str, vertical: Optional[str] = None):
     # golden file is <dataset_id>.golden.json
-    repo: DatasetRepository = app.state.orch.repo
+    ctx = _get_or_create_vertical_context(vertical)
+    repo: DatasetRepository = ctx['orch'].repo
     p = repo.root_dir / f"{dataset_id}.golden.json"
     if not p.exists():
         raise HTTPException(status_code=404, detail="golden not found")
@@ -356,8 +484,9 @@ class SaveDatasetBody(BaseModel):
 
 
 @app.post("/datasets/save")
-async def save_dataset(body: SaveDatasetBody):
-    repo: DatasetRepository = app.state.orch.repo
+async def save_dataset(body: SaveDatasetBody, vertical: Optional[str] = None):
+    ctx = _get_or_create_vertical_context(vertical)
+    repo: DatasetRepository = ctx['orch'].repo
     root: Path = repo.root_dir
     ds = body.dataset
     gt = body.golden
@@ -411,6 +540,7 @@ class CoverageGenerateRequest(BaseModel):
     overwrite: bool = False
     version: str = "1.0.0"
     as_array: bool = False
+    vertical: Optional[str] = None
 
 
 @app.post("/coverage/generate")
@@ -422,7 +552,8 @@ async def coverage_generate(req: CoverageGenerateRequest):
             if req.dry_run or not req.save:
                 return {"ok": True, "saved": False, "count": len(items), "counts_by_risk": counts}
             # Save array to datasets folder as a single file
-            repo: DatasetRepository = app.state.orch.repo
+            ctx = _get_or_create_vertical_context(req.vertical)
+            repo: DatasetRepository = ctx['orch'].repo
             root: Path = repo.root_dir
             root.mkdir(parents=True, exist_ok=True)
             out = {
@@ -464,8 +595,9 @@ async def coverage_generate(req: CoverageGenerateRequest):
 
     # Save if requested
     if req.save:
-        repo: DatasetRepository = app.state.orch.repo
-        root: Path = repo.root_dir
+        ctx = _get_or_create_vertical_context(req.vertical)
+        repo: DatasetRepository = ctx['orch'].repo
+        root: Path = repo.root_dir  # e.g., <repo>/datasets/<vertical>
         root.mkdir(parents=True, exist_ok=True)
         written = []
         # Read path settings
@@ -473,6 +605,11 @@ async def coverage_generate(req: CoverageGenerateRequest):
         dp = (cov or {}).get('dataset_paths') or {}
         path_mode = (dp.get('mode') or 'flat').lower()
         base_sub = dp.get('base') or None
+        # Avoid duplicating the vertical subfolder (e.g., datasets/commerce/commerce)
+        try:
+            current_vertical = str(ctx.get('vertical', '')).strip().lower() or None
+        except Exception:
+            current_vertical = None
         def build_paths(ds_id: str, ds_obj: dict) -> tuple[Path, Path]:
             if path_mode == 'hierarchical':
                 # datasets/commerce/<behavior>/<version>/<slug>.json
@@ -493,15 +630,19 @@ async def coverage_generate(req: CoverageGenerateRequest):
                         behavior = 'unknown'
                 version = str(ds_obj.get('version') or '1.0.0')
                 slug = ds_id
-                sub = Path(base_sub) if isinstance(base_sub, str) and base_sub else Path('commerce')
-                folder = root / sub / behavior / version
+                # Only honor base_sub if it is set and not equal to the current vertical
+                use_sub = (isinstance(base_sub, str) and base_sub.strip()) or None
+                if use_sub and current_vertical and use_sub.strip().lower() == current_vertical:
+                    use_sub = None
+                folder = (root / Path(use_sub)) if use_sub else root
+                folder = folder / behavior / version
                 folder.mkdir(parents=True, exist_ok=True)
                 return folder / f"{slug}.dataset.json", folder / f"{slug}.golden.json"
             # default flat: use base subfolder if specified
-            if isinstance(base_sub, str) and base_sub:
-                folder = root / base_sub
-            else:
-                folder = root
+            use_sub = (isinstance(base_sub, str) and base_sub.strip()) or None
+            if use_sub and current_vertical and use_sub.strip().lower() == current_vertical:
+                use_sub = None
+            folder = (root / use_sub) if use_sub else root
             folder.mkdir(parents=True, exist_ok=True)
             return folder / f"{ds_id}.dataset.json", folder / f"{ds_id}.golden.json"
         for ds, gd in outputs:
@@ -642,8 +783,9 @@ async def coverage_per_turn_csv(body: PerTurnReportBody):
 
 
 @app.get("/conversations/{conversation_id}")
-async def get_conversation(conversation_id: str):
-    repo: DatasetRepository = app.state.orch.repo
+async def get_conversation(conversation_id: str, vertical: Optional[str] = None):
+    ctx = _get_or_create_vertical_context(vertical)
+    repo: DatasetRepository = ctx['orch'].repo
     conv = repo.get_conversation(conversation_id)
     try:
         golden = repo.get_golden(conversation_id)
@@ -654,7 +796,14 @@ async def get_conversation(conversation_id: str):
 
 @app.post("/runs", response_model=StartRunResponse)
 async def start_run(req: StartRunRequest):
-    orch: Orchestrator = app.state.orch
+    # choose vertical context from settings if not provided in config.context
+    vertical = None
+    try:
+        vertical = (req.context or {}).get("vertical")  # allow frontend to pass context.vertical
+    except Exception:
+        vertical = None
+    ctx = _get_or_create_vertical_context(vertical)
+    orch: Orchestrator = ctx['orch']
     cfg: Dict[str, Any] = {
         "metrics": req.metrics or [],
         "thresholds": req.thresholds or {},
@@ -662,36 +811,45 @@ async def start_run(req: StartRunRequest):
     }
     jr = orch.submit(dataset_id=req.dataset_id, model_spec=req.model_spec, config=cfg)
     # initialize run folder with config
-    app.state.artifacts.init_run(jr.run_id, {"dataset_id": req.dataset_id, "model_spec": req.model_spec, **cfg})
+    ctx['artifacts'].init_run(jr.run_id, {"dataset_id": req.dataset_id, "model_spec": req.model_spec, **cfg})
     orch.start(jr.job_id)
     return StartRunResponse(job_id=jr.job_id, run_id=jr.run_id, state=jr.state)
 
 
 @app.post("/runs/{job_id}/control")
 async def control_run(job_id: str, body: ControlBody):
-    orch: Orchestrator = app.state.orch
-    jr = orch.jobs.get(job_id)
-    if not jr:
+    # find job across all vertical orchestrators
+    jr = None
+    orch: Orchestrator | None = None
+    for c in _iter_all_contexts():
+        o: Orchestrator = c['orch']
+        if job_id in o.jobs:
+            orch = o
+            jr = o.jobs.get(job_id)
+            break
+    if orch is None:
         # Allow 'cancel' to mark a stale job as cancelled if persisted job.json exists
-        reader: RunArtifactReader = app.state.reader
-        for p in sorted(reader.layout.runs_root.iterdir()):
-            if not p.is_dir():
-                continue
-            jpath = p / "job.json"
-            if not jpath.exists():
-                continue
-            try:
-                obj = json.loads(jpath.read_text(encoding="utf-8"))
-            except Exception:
-                continue
-            if obj.get("job_id") == job_id:
-                act = (body.action or '').lower()
-                if act in ('cancel','abort'):
-                    obj["state"] = "cancelled"
-                    obj["error"] = "cancelled by user after restart"
-                    jpath.write_text(json.dumps(obj, indent=2), encoding="utf-8")
-                    return obj
-                raise HTTPException(status_code=404, detail="job not running")
+        # search across readers
+        for c in _iter_all_contexts():
+            reader: RunArtifactReader = c['reader']
+            for p in sorted(reader.layout.runs_root.iterdir()):
+                if not p.is_dir():
+                    continue
+                jpath = p / "job.json"
+                if not jpath.exists():
+                    continue
+                try:
+                    obj = json.loads(jpath.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                if obj.get("job_id") == job_id:
+                    act = (body.action or '').lower()
+                    if act in ('cancel','abort'):
+                        obj["state"] = "cancelled"
+                        obj["error"] = "cancelled by user after restart"
+                        jpath.write_text(json.dumps(obj, indent=2), encoding="utf-8")
+                        return obj
+                    raise HTTPException(status_code=404, detail="job not running")
         raise HTTPException(status_code=404, detail="job not found")
     act = (body.action or '').lower()
     try:
@@ -721,12 +879,23 @@ async def control_run(job_id: str, body: ControlBody):
 
 @app.get("/runs/{job_id}/status")
 async def run_status(job_id: str):
-    orch: Orchestrator = app.state.orch
-    jr = orch.jobs.get(job_id)
-    if not jr:
-        # Try to recover from persisted job status if the process lost in-memory job
-        # Search runs folder for a job.json containing this job_id
-        reader: RunArtifactReader = app.state.reader
+    # search in-memory jobs across verticals
+    for c in _iter_all_contexts():
+        orch: Orchestrator = c['orch']
+        jr = orch.jobs.get(job_id)
+        if jr:
+            return {
+                "job_id": jr.job_id,
+                "run_id": jr.run_id,
+                "state": jr.state,
+                "progress_pct": jr.progress_pct,
+                "total_conversations": jr.total_conversations,
+                "completed_conversations": jr.completed_conversations,
+                "error": jr.error,
+            }
+    # Try to recover from persisted job status if the process lost in-memory job across verticals
+    for c in _iter_all_contexts():
+        reader: RunArtifactReader = c['reader']
         for p in sorted(reader.layout.runs_root.iterdir()):
             if not p.is_dir():
                 continue
@@ -735,11 +904,10 @@ async def run_status(job_id: str):
             except Exception:
                 continue
             if obj.get("job_id") == job_id:
-                # If the recorded boot_id differs from current, mark stale running states as failed
                 if obj.get("boot_id") != BOOT_ID and obj.get("state") in ("running", "paused", "cancelling"):
                     obj = {**obj, "state": "failed", "error": "stale status from previous server session"}
                 return obj
-        raise HTTPException(status_code=404, detail="job not found")
+    raise HTTPException(status_code=404, detail="job not found")
     return {
         "job_id": jr.job_id,
         "run_id": jr.run_id,
@@ -752,12 +920,18 @@ async def run_status(job_id: str):
 
 
 @app.get("/runs/{run_id}/results")
-async def run_results(run_id: str):
-    reader: RunArtifactReader = app.state.reader
-    path = reader.layout.results_json_path(run_id)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail="results not found")
-    return get_json_file(path)
+async def run_results(run_id: str, vertical: Optional[str] = None):
+    paths = []
+    if vertical:
+        c = _get_or_create_vertical_context(vertical)
+        paths.append(c['reader'].layout.results_json_path(run_id))
+    else:
+        for c in _iter_all_contexts():
+            paths.append(c['reader'].layout.results_json_path(run_id))
+    for path in paths:
+        if path.exists():
+            return get_json_file(path)
+    raise HTTPException(status_code=404, detail="results not found")
 
 
 def get_json_file(path: Path):
@@ -769,30 +943,44 @@ def get_json_file(path: Path):
 
 
 @app.get("/runs/{run_id}/artifacts")
-async def run_artifacts(run_id: str, type: str = "json"):
-    reader: RunArtifactReader = app.state.reader
+async def run_artifacts(run_id: str, type: str = "json", vertical: Optional[str] = None):
     reporter: Reporter = app.state.reporter
+    # pick reader by vertical or search
+    readers: list[RunArtifactReader] = []
+    if vertical:
+        readers = [_get_or_create_vertical_context(vertical)['reader']]
+    else:
+        readers = [c['reader'] for c in _iter_all_contexts()]
     if type == "json":
-        path = reader.layout.results_json_path(run_id)
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="results.json not found")
-        return FileResponse(str(path), media_type="application/json", filename="results.json")
+        for reader in readers:
+            path = reader.layout.results_json_path(run_id)
+            if path.exists():
+                return FileResponse(str(path), media_type="application/json", filename="results.json")
+        raise HTTPException(status_code=404, detail="results.json not found")
     elif type == "csv":
-        path = reader.layout.results_csv_path(run_id)
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="results.csv not found")
-        return FileResponse(str(path), media_type="text/csv", filename="results.csv")
+        for reader in readers:
+            path = reader.layout.results_csv_path(run_id)
+            if path.exists():
+                return FileResponse(str(path), media_type="text/csv", filename="results.csv")
+        raise HTTPException(status_code=404, detail="results.csv not found")
     elif type == "html":
         # generate on the fly from results.json
-        json_path = reader.layout.results_json_path(run_id)
-        if not json_path.exists():
+        json_path = None
+        rd_for_html = None
+        for reader in readers:
+            cand = reader.layout.results_json_path(run_id)
+            if cand.exists():
+                json_path = cand
+                rd_for_html = reader
+                break
+        if json_path is None:
             raise HTTPException(status_code=404, detail="results.json not found")
         results = get_json_file(json_path)
         try:
             html = reporter.render_html(results)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"cannot render html: {e}")
-        out_path = reader.layout.run_dir(run_id) / "report.html"
+        out_path = rd_for_html.layout.run_dir(run_id) / "report.html"
         out_path.write_text(html, encoding="utf-8")
         return FileResponse(str(out_path), media_type="text/html", filename="report.html")
     else:
@@ -800,13 +988,29 @@ async def run_artifacts(run_id: str, type: str = "json"):
 
 
     @app.post("/runs/{run_id}/rebuild")
-    async def rebuild_run_artifacts(run_id: str):
+    async def rebuild_run_artifacts(run_id: str, vertical: Optional[str] = None):
         """Rebuild and enrich results.json and results.csv for an existing run.
         Adds human-friendly identity, per-turn snippets, rollups, and writes CSV.
         """
-        reader: RunArtifactReader = app.state.reader
-        writer: RunArtifactWriter = app.state.artifacts
-        repo: DatasetRepository = app.state.orch.repo
+        # locate by vertical or search across
+        if vertical:
+            ctx = _get_or_create_vertical_context(vertical)
+            reader: RunArtifactReader = ctx['reader']
+            writer: RunArtifactWriter = ctx['artifacts']
+            repo: DatasetRepository = ctx['orch'].repo
+        else:
+            # search for run_id
+            reader = None
+            writer = None
+            repo = None
+            for c in _iter_all_contexts():
+                if (c['reader'].layout.run_dir(run_id)).exists():
+                    reader = c['reader']
+                    writer = c['artifacts']
+                    repo = c['orch'].repo
+                    break
+            if reader is None or writer is None or repo is None:
+                raise HTTPException(status_code=404, detail="run not found")
         # Load existing
         res_path = reader.layout.results_json_path(run_id)
         if not res_path.exists():
@@ -947,9 +1151,20 @@ async def run_artifacts(run_id: str, type: str = "json"):
 
 
 @app.post("/runs/{run_id}/feedback")
-async def submit_feedback(run_id: str, body: Dict[str, Any]):
+async def submit_feedback(run_id: str, body: Dict[str, Any], vertical: Optional[str] = None):
     # Append feedback objects to runs/<run_id>/feedback.json
-    run_dir = app.state.reader.layout.run_dir(run_id)
+    # locate run dir
+    if vertical:
+        run_dir = _get_or_create_vertical_context(vertical)['reader'].layout.run_dir(run_id)
+    else:
+        run_dir = None
+        for c in _iter_all_contexts():
+            cand = c['reader'].layout.run_dir(run_id)
+            if cand.exists():
+                run_dir = cand
+                break
+        if run_dir is None:
+            raise HTTPException(status_code=404, detail="run not found")
     fb_path = run_dir / "feedback.json"
     arr: list = []
     if fb_path.exists():
@@ -966,11 +1181,31 @@ async def submit_feedback(run_id: str, body: Dict[str, Any]):
 
 
 @app.get("/compare")
-async def compare_runs(runA: str, runB: str):
-    reader: RunArtifactReader = app.state.reader
-    a = reader.layout.results_json_path(runA)
-    b = reader.layout.results_json_path(runB)
-    if not a.exists() or not b.exists():
+async def compare_runs(runA: str, runB: str, verticalA: Optional[str] = None, verticalB: Optional[str] = None):
+    paths = []
+    # resolve for A
+    if verticalA:
+        ca = _get_or_create_vertical_context(verticalA)['reader']
+        a = ca.layout.results_json_path(runA)
+    else:
+        a = None
+        for c in _iter_all_contexts():
+            cand = c['reader'].layout.results_json_path(runA)
+            if cand.exists():
+                a = cand
+                break
+    # resolve for B
+    if verticalB:
+        cb = _get_or_create_vertical_context(verticalB)['reader']
+        b = cb.layout.results_json_path(runB)
+    else:
+        b = None
+        for c in _iter_all_contexts():
+            cand = c['reader'].layout.results_json_path(runB)
+            if cand.exists():
+                b = cand
+                break
+    if a is None or b is None or (not a.exists()) or (not b.exists()):
         raise HTTPException(status_code=404, detail="one or both results.json missing")
     A = get_json_file(a)
     B = get_json_file(b)
@@ -989,54 +1224,59 @@ async def compare_runs(runA: str, runB: str):
 
 
 class RunListItem(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     run_id: str
     dataset_id: Optional[str] = None
     model_spec: Optional[str] = None
     has_results: bool
     created_ts: Optional[float] = None
+    vertical: Optional[str] = None
 
 
 @app.get("/runs")
-async def list_runs():
-    """List runs by inspecting the runs/ folder."""
-    reader: RunArtifactReader = app.state.reader
-    layout = reader.layout
+async def list_runs(vertical: Optional[str] = None):
+    """List runs by inspecting runs/<vertical>/ folder. Defaults to selected vertical."""
+    contexts = [_get_or_create_vertical_context(vertical)] if vertical else _iter_all_contexts()
     items: list[dict[str, Any]] = []
-    if not layout.runs_root.exists():
-        return items
-    for p in sorted(layout.runs_root.iterdir()):
-        if not p.is_dir():
+    for c in contexts:
+        vname = c['vertical']
+        reader: RunArtifactReader = c['reader']
+        layout = reader.layout
+        if not layout.runs_root.exists():
             continue
-        run_id = p.name
-        cfg_path = p / 'run_config.json'
-        res_path = p / 'results.json'
-        cfg = {}
-        try:
-            if cfg_path.exists():
-                cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
-        except Exception:
+        for p in sorted(layout.runs_root.iterdir()):
+            if not p.is_dir():
+                continue
+            run_id = p.name
+            cfg_path = p / 'run_config.json'
+            res_path = p / 'results.json'
             cfg = {}
-        # Try to read persisted job status to enrich item
-        job_state = app.state.reader.read_job_status(run_id)
-        # Determine staleness
-        boot_id = (job_state or {}).get('boot_id')
-        is_stale = (boot_id is None) or (boot_id != BOOT_ID)
-        state_val = (job_state or {}).get('state')
-        # If stale and previously active, show 'stale'
-        if is_stale and state_val in ("running","paused","cancelling"):
-            state_val = "stale"
-        items.append({
-            'run_id': run_id,
-            'dataset_id': cfg.get('dataset_id'),
-            'model_spec': cfg.get('model_spec'),
-            'has_results': res_path.exists(),
-            'created_ts': cfg_path.stat().st_mtime if cfg_path.exists() else None,
-            'state': state_val,
-            'progress_pct': (job_state or {}).get('progress_pct'),
-            'completed_conversations': (job_state or {}).get('completed_conversations'),
-            'job_id': (job_state or {}).get('job_id'),
-            'stale': is_stale,
-        })
+            try:
+                if cfg_path.exists():
+                    cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
+            except Exception:
+                cfg = {}
+            # Try to read persisted job status to enrich item
+            job_state = reader.read_job_status(run_id)
+            # Determine staleness
+            boot_id = (job_state or {}).get('boot_id')
+            is_stale = (boot_id is None) or (boot_id != BOOT_ID)
+            state_val = (job_state or {}).get('state')
+            if is_stale and state_val in ("running","paused","cancelling"):
+                state_val = "stale"
+            items.append({
+                'run_id': run_id,
+                'dataset_id': cfg.get('dataset_id'),
+                'model_spec': cfg.get('model_spec'),
+                'has_results': res_path.exists(),
+                'created_ts': cfg_path.stat().st_mtime if cfg_path.exists() else None,
+                'state': state_val,
+                'progress_pct': (job_state or {}).get('progress_pct'),
+                'completed_conversations': (job_state or {}).get('completed_conversations'),
+                'job_id': (job_state or {}).get('job_id'),
+                'stale': is_stale,
+                'vertical': vname,
+            })
     return items
 
 
@@ -1045,7 +1285,12 @@ async def validate_json(body: Dict[str, Any]):
     """Validate payload against a named schema without saving.
     Body shape: {"type": "dataset"|"golden"|"run_config", "payload": {...}}
     """
-    sv = app.state.orch.repo.sv
+    # Use SchemaValidator directly (not tied to a vertical)
+    try:
+        from .schemas import SchemaValidator  # type: ignore
+    except Exception:
+        from backend.schemas import SchemaValidator  # type: ignore
+    sv = SchemaValidator()
     t = body.get("type")
     payload = body.get("payload")
     if t not in ("dataset", "golden", "run_config"):

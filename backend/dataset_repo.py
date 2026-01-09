@@ -18,10 +18,12 @@ class DatasetRepository:
 
     # File conventions: <dataset_id>.dataset.json and <dataset_id>.golden.json
     def _dataset_files(self) -> List[Path]:
-        return sorted(self.root_dir.glob("*.dataset.json"))
+        # Support both flat and hierarchical layouts under the vertical root
+        # e.g., datasets/<vertical>/*.dataset.json or datasets/<vertical>/<behavior>/<version>/*.dataset.json
+        return sorted(self.root_dir.rglob("*.dataset.json"))
 
     def _golden_files(self) -> List[Path]:
-        return sorted(self.root_dir.glob("*.golden.json"))
+        return sorted(self.root_dir.rglob("*.golden.json"))
 
     def _load_json(self, p: Path) -> Dict[str, Any]:
         try:
@@ -61,9 +63,12 @@ class DatasetRepository:
         return items
 
     def get_dataset(self, dataset_id: str) -> Dict[str, Any]:
-        p = self.root_dir / f"{dataset_id}.dataset.json"
-        if not p.exists():
-            raise FileNotFoundError(f"Dataset file not found: {p.name}")
+        # Search in root and nested folders for the exact dataset filename
+        candidates = list(self.root_dir.rglob(f"{dataset_id}.dataset.json"))
+        if not candidates:
+            raise FileNotFoundError(f"Dataset file not found: {dataset_id}.dataset.json")
+        # prefer the shallowest path
+        p = sorted(candidates, key=lambda x: len(x.parts))[0]
         data = self._load_json(p)
         errors = self.sv.validate("dataset", data)
         if errors:

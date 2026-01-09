@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import { Input } from '../components/Form'
+import { useVertical } from '../context/VerticalContext'
 
 type Settings = {
   ollama_host: string | null
@@ -11,9 +12,12 @@ type Settings = {
   hallucination_threshold?: number
   models?: { ollama?: string; gemini?: string; openai?: string }
   embed_model?: string
+  industry_vertical?: string
+  supported_verticals?: string[]
 }
 
 export default function SettingsPage() {
+  const { vertical, supported, setVertical } = useVertical()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [ollama, setOllama] = useState('')
   const [apiKeyGemini, setApiKeyGemini] = useState('')
@@ -67,6 +71,15 @@ export default function SettingsPage() {
 
   return (
     <div className="grid gap-4">
+      <Card title="Vertical">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="w-40">Industry Vertical</span>
+          <select className="border rounded px-2 py-1" value={vertical} onChange={e => setVertical(e.target.value)}>
+            {supported.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+          <span className="text-xs text-gray-600">Affects dataset and run storage locations</span>
+        </div>
+      </Card>
       <Card title="Provider Settings (.env dev-only)">
         {settings ? (
           <div className="space-y-3 text-sm">
