@@ -31,6 +31,10 @@ else:
     )
     from .coverage_manifest import CoverageManifestor
     from .coverage_reports import coverage_summary_csv, coverage_heatmap_csv, per_turn_csv
+    from .coverage_config import CoverageConfig
+    from .array_builder_v2 import build_combined_array
+    from .array_builder_v2 import build_combined_array
+    from .coverage_config import CoverageConfig
 
 APP_VERSION = "0.1.0-mvp"
 
@@ -406,12 +410,36 @@ class CoverageGenerateRequest(BaseModel):
     save: bool = False
     overwrite: bool = False
     version: str = "1.0.0"
+    as_array: bool = False
 
 
 @app.post("/coverage/generate")
 async def coverage_generate(req: CoverageGenerateRequest):
     # Build datasets/goldens per request
     try:
+        if req.as_array:
+            items, counts = build_combined_array(domains=req.domains, behaviors=req.behaviors, version=req.version)
+            if req.dry_run or not req.save:
+                return {"ok": True, "saved": False, "count": len(items), "counts_by_risk": counts}
+            # Save array to datasets folder as a single file
+            repo: DatasetRepository = app.state.orch.repo
+            root: Path = repo.root_dir
+            root.mkdir(parents=True, exist_ok=True)
+            out = {
+                "schema": "combined_array.v1",
+                "version": req.version,
+                "items": items,
+            }
+            # Path honors dataset_paths if hierarchical: write under datasets/arrays/
+            arrays_dir = root / "arrays"
+            arrays_dir.mkdir(parents=True, exist_ok=True)
+            file_name = f"combined_array-{req.version}.json"
+            p = arrays_dir / file_name
+            if p.exists() and not req.overwrite:
+                from fastapi import HTTPException
+                raise HTTPException(status_code=409, detail=f"{file_name} exists; set overwrite=true")
+            p.write_text(json.dumps(out, indent=2), encoding="utf-8")
+            return {"ok": True, "saved": True, "file": str(p)}
         if req.combined:
             # Build per-domain combined and a global combined
             domain_outputs = build_domain_combined_datasets(domains=req.domains, behaviors=req.behaviors, version=req.version)
@@ -440,6 +468,42 @@ async def coverage_generate(req: CoverageGenerateRequest):
         root: Path = repo.root_dir
         root.mkdir(parents=True, exist_ok=True)
         written = []
+        # Read path settings
+        cov = CoverageConfig().load_coverage()
+        dp = (cov or {}).get('dataset_paths') or {}
+        path_mode = (dp.get('mode') or 'flat').lower()
+        base_sub = dp.get('base') or None
+        def build_paths(ds_id: str, ds_obj: dict) -> tuple[Path, Path]:
+            if path_mode == 'hierarchical':
+                # datasets/commerce/<behavior>/<version>/<slug>.json
+                behavior = None
+                try:
+                    # prefer from first conversation metadata
+                    c0 = (ds_obj.get('conversations') or [{}])[0]
+                    behavior = ((c0.get('metadata') or {}).get('behavior'))
+                except Exception:
+                    behavior = None
+                if not behavior:
+                    # fallback: parse from dataset_id like "<domain>-<behavior>-v<version>"
+                    try:
+                        parts = ds_id.split('-')
+                        if len(parts) >= 3:
+                            behavior = parts[1]
+                    except Exception:
+                        behavior = 'unknown'
+                version = str(ds_obj.get('version') or '1.0.0')
+                slug = ds_id
+                sub = Path(base_sub) if isinstance(base_sub, str) and base_sub else Path('commerce')
+                folder = root / sub / behavior / version
+                folder.mkdir(parents=True, exist_ok=True)
+                return folder / f"{slug}.dataset.json", folder / f"{slug}.golden.json"
+            # default flat: use base subfolder if specified
+            if isinstance(base_sub, str) and base_sub:
+                folder = root / base_sub
+            else:
+                folder = root
+            folder.mkdir(parents=True, exist_ok=True)
+            return folder / f"{ds_id}.dataset.json", folder / f"{ds_id}.golden.json"
         for ds, gd in outputs:
             # validate
             ds_errors = repo.sv.validate("dataset", ds)
@@ -449,8 +513,7 @@ async def coverage_generate(req: CoverageGenerateRequest):
             if gt_errors:
                 raise HTTPException(status_code=400, detail={"type": "golden", "dataset_id": gd.get("dataset_id"), "errors": gt_errors})
             dataset_id = ds["dataset_id"]
-            ds_path = root / f"{dataset_id}.dataset.json"
-            gt_path = root / f"{dataset_id}.golden.json"
+            ds_path, gt_path = build_paths(dataset_id, ds)
             if not req.overwrite and (ds_path.exists() or gt_path.exists()):
                 raise HTTPException(status_code=409, detail=f"{dataset_id} already exists; set overwrite=true")
             ds_path.write_text(json.dumps(ds, indent=2), encoding="utf-8")
@@ -480,6 +543,72 @@ async def coverage_manifest(domains: Optional[str] = None, behaviors: Optional[s
     if behs:
         pairs = [p for p in pairs if p.get("behavior") in behs]
     return {"seed": seed, "axes_order": manifest.get("axes_order"), "pairs": pairs}
+
+
+class CoverageSettingsBody(BaseModel):
+    mode: Optional[str] = None
+    t: Optional[int] = None
+    per_behavior_budget: Optional[int] = None
+    anchors: Optional[list[dict]] = None
+    sampler: Optional[dict] = None  # { rng_seed?: int, per_behavior_total?: int, min_per_domain?: int }
+
+
+@app.get("/coverage/settings")
+async def coverage_settings_get():
+    cfg = CoverageConfig()
+    data = cfg.load_coverage()
+    return data
+
+
+@app.post("/coverage/settings")
+async def coverage_settings_set(body: CoverageSettingsBody):
+    """Update configs/coverage.json (strategy controls). Only merges allowed keys."""
+    cfg = CoverageConfig()
+    p = cfg.root / 'coverage.json'
+    # read existing or default
+    current: dict = {}
+    if p.exists():
+        try:
+            current = json.loads(p.read_text(encoding='utf-8'))
+        except Exception:
+            current = {}
+    # merge
+    def set_if(v, key):
+        nonlocal current
+        if v is not None:
+            current[key] = v
+    set_if(body.mode, 'mode')
+    set_if(body.t, 't')
+    set_if(body.per_behavior_budget, 'per_behavior_budget')
+    if body.anchors is not None:
+        current['anchors'] = body.anchors
+    if body.sampler is not None:
+        samp = current.get('sampler') or {}
+        for k in ('rng_seed','per_behavior_total','min_per_domain'):
+            if k in body.sampler and body.sampler[k] is not None:
+                samp[k] = int(body.sampler[k])
+        current['sampler'] = samp
+    # basic validation
+    try:
+        # load_coverage will normalize and validate basic fields
+        tmp = (cfg.root / 'coverage.json.tmp')
+        tmp.write_text(json.dumps(current, indent=2), encoding='utf-8')
+        _ = cfg.load_coverage(tmp)
+        # ok → write final
+        p.write_text(json.dumps(current, indent=2), encoding='utf-8')
+        try:
+            tmp.unlink()
+        except Exception:
+            pass
+    except Exception as e:
+        # rollback temp, surface error
+        try:
+            tmp.unlink()
+        except Exception:
+            pass
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"invalid coverage settings: {e}")
+    return {"ok": True, "settings": current}
 
 
 @app.get("/coverage/report.csv")

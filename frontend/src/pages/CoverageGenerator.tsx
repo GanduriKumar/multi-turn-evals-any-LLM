@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import { Checkbox, Select } from '../components/Form'
+import { Input } from '../components/Form'
 
 type Pair = {
   domain: string
@@ -25,6 +26,9 @@ export default function CoverageGeneratorPage() {
   const [err, setErr] = useState<string| null>(null)
   const [regenBusy, setRegenBusy] = useState(false)
   const [regenMsg, setRegenMsg] = useState<string | null>(null)
+  const [covSettings, setCovSettings] = useState<any | null>(null)
+  const [saveCovBusy, setSaveCovBusy] = useState(false)
+  const [saveCovMsg, setSaveCovMsg] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -32,6 +36,10 @@ export default function CoverageGeneratorPage() {
       const js = await r.json()
       setDomains(js.domains || [])
       setBehaviors(js.behaviors || [])
+      try {
+        const cs = await fetch('/coverage/settings')
+        if (cs.ok) setCovSettings(await cs.json())
+      } catch {}
     }
     load()
   }, [])
@@ -118,6 +126,55 @@ export default function CoverageGeneratorPage() {
 
   return (
     <div className="grid gap-4">
+      <Card title="Coverage Strategy (Server)">
+        {covSettings ? (
+          <div className="grid sm:grid-cols-3 gap-3 text-sm">
+            <label className="flex items-center gap-2"><span className="w-32">Mode</span>
+              <Select className="grow" value={covSettings.mode || 'pairwise'} onChange={e => setCovSettings((x:any)=>({...x, mode: e.target.value}))}>
+                <option value="pairwise">pairwise</option>
+                <option value="exhaustive">exhaustive</option>
+              </Select>
+            </label>
+            <label className="flex items-center gap-2"><span className="w-32">t</span>
+              <Input type="number" min={2} className="w-28" value={covSettings.t || 2} onChange={e => setCovSettings((x:any)=>({...x, t: Number(e.target.value)}))} />
+            </label>
+            <label className="flex items-center gap-2"><span className="w-32">Budget</span>
+              <Input type="number" min={1} className="w-28" value={covSettings.per_behavior_budget || 120} onChange={e => setCovSettings((x:any)=>({...x, per_behavior_budget: Number(e.target.value)}))} />
+            </label>
+            <label className="flex items-center gap-2"><span className="w-32">Seed</span>
+              <Input type="number" className="w-28" value={(covSettings.sampler?.rng_seed) ?? 42} onChange={e => setCovSettings((x:any)=>({
+                ...x, sampler: { ...(x.sampler||{}), rng_seed: Number(e.target.value) }
+              }))} />
+            </label>
+            <label className="flex items-center gap-2"><span className="w-32">Per-behavior</span>
+              <Input type="number" min={1} className="w-28" value={(covSettings.sampler?.per_behavior_total) ?? 100} onChange={e => setCovSettings((x:any)=>({
+                ...x, sampler: { ...(x.sampler||{}), per_behavior_total: Number(e.target.value) }
+              }))} />
+            </label>
+            <label className="flex items-center gap-2"><span className="w-32">Min/domain</span>
+              <Input type="number" min={0} className="w-28" value={(covSettings.sampler?.min_per_domain) ?? 3} onChange={e => setCovSettings((x:any)=>({
+                ...x, sampler: { ...(x.sampler||{}), min_per_domain: Number(e.target.value) }
+              }))} />
+            </label>
+            <div className="col-span-full flex items-center gap-2">
+              <Button onClick={async ()=>{
+                setSaveCovMsg(null); setSaveCovBusy(true)
+                try {
+                  const r = await fetch('/coverage/settings', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(covSettings) })
+                  const js = await r.json().catch(()=>({}))
+                  if (!r.ok) throw new Error(js?.detail || 'Save failed')
+                  setSaveCovMsg('Saved. New generations will use these settings.')
+                } catch(e:any) {
+                  setSaveCovMsg(e.message || 'Save failed')
+                } finally { setSaveCovBusy(false) }
+              }} disabled={saveCovBusy}>{saveCovBusy?'Saving…':'Save'}</Button>
+              {saveCovMsg && <span className="text-xs">{saveCovMsg}</span>}
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">Loading…</div>
+        )}
+      </Card>
       <Card title="Coverage Generator">
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
           <label className="flex items-center gap-2"><span className="w-28">Domains</span>

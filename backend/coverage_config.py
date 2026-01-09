@@ -129,11 +129,15 @@ class CoverageConfig:
                 except Exception:
                     per_behavior_budget = None
             anchors = data.get("anchors") or []
+            sampler = data.get("sampler") or {}
+            dataset_paths = data.get("dataset_paths") or {}
             return {
                 "mode": mode,
                 "t": t,
                 "per_behavior_budget": per_behavior_budget,
                 "anchors": anchors,
+                "sampler": sampler,
+                "dataset_paths": dataset_paths,
             }
         except Exception:
             return {"mode": "exhaustive"}

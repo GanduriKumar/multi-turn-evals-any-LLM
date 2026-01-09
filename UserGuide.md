@@ -75,6 +75,10 @@ If you prefer manually:
 
 Tip (Windows): avoid --reload when starting uvicorn for this project.
 
+CI (GitHub Actions):
+- Push or open a PR to trigger the workflow at `.github/workflows/ci.yml`.
+- It runs backend Python tests and frontend Vitest.
+
 ---
 
 ## Quick smoke test
@@ -274,8 +278,10 @@ Common endpoints:
 - GET /coverage/taxonomy — list domains and behaviors
 - GET /coverage/manifest — preview counts per domain×behavior pair (query params: domains, behaviors)
 - POST /coverage/generate — generate datasets/goldens (combined or split) with options to save
+- POST /coverage/generate (as_array=true) — emit a single JSON array with the combined scenario schema (Prompt 14)
 - GET /coverage/report.csv?type=summary|heatmap — download CSV reports
 - POST /coverage/per-turn.csv — generate a per-turn CSV for a dataset/golden payload
+- GET/POST /coverage/settings — read/write coverage strategy (pairwise/exhaustive, budgets, sampler overrides; Prompt 13)
 
 ---
 
