@@ -106,13 +106,17 @@ class Orchestrator:
     def cancel(self, job_id: str) -> None:
         jr = self.jobs[job_id]
         jr._cancel = True
-        # If job is not yet running, mark as cancelled immediately
-        if jr.state in ("queued", "paused"):
+        jr.updated_at = _now_iso()
+        # If there's an active task, cancel it immediately and mark cancelled
+        if jr._task and not jr._task.done():
+            try:
+                jr._task.cancel()
+            except Exception:
+                pass
             jr.state = "cancelled"
         else:
-            # surface intent immediately
-            jr.state = "cancelling"
-        jr.updated_at = _now_iso()
+            # If not yet started or already paused, mark cancelled
+            jr.state = "cancelled" if jr.state in ("queued", "paused") else "cancelling"
         try:
             self._writer.write_job_status(jr.run_id, {
                 "job_id": jr.job_id,
@@ -121,7 +125,7 @@ class Orchestrator:
                 "progress_pct": jr.progress_pct,
                 "total_conversations": jr.total_conversations,
                 "completed_conversations": jr.completed_conversations,
-                "error": None,
+                "error": "cancelled by user" if jr.state == "cancelled" else None,
                 "boot_id": self.boot_id,
             })
         except Exception:
@@ -173,26 +177,26 @@ class Orchestrator:
 
     async def run_job(self, job_id: str) -> JobRecord:
         jr = self.jobs[job_id]
-        if jr.state not in ("queued",):
-            return jr
-        jr.state = "running"
-        jr.updated_at = _now_iso()
-        # write running status
         try:
-            self._writer.write_job_status(jr.run_id, {
-                "job_id": jr.job_id,
-                "run_id": jr.run_id,
-                "state": jr.state,
-                "progress_pct": jr.progress_pct,
-                "total_conversations": jr.total_conversations,
-                "completed_conversations": jr.completed_conversations,
-                "error": None,
-                "boot_id": self.boot_id,
-            })
-        except Exception:
-            pass
+            if jr.state not in ("queued",):
+                return jr
+            jr.state = "running"
+            jr.updated_at = _now_iso()
+            # write running status
+            try:
+                self._writer.write_job_status(jr.run_id, {
+                    "job_id": jr.job_id,
+                    "run_id": jr.run_id,
+                    "state": jr.state,
+                    "progress_pct": jr.progress_pct,
+                    "total_conversations": jr.total_conversations,
+                    "completed_conversations": jr.completed_conversations,
+                    "error": None,
+                    "boot_id": self.boot_id,
+                })
+            except Exception:
+                pass
 
-        try:
             ds = self.repo.get_dataset(jr.config["dataset_id"])
             provider, model = self.parse_model_spec(jr.config["model_spec"])  # e.g., 'ollama', 'llama3.2:2b'
             domain = ds.get("metadata", {}).get("domain", "commerce")
@@ -670,6 +674,24 @@ class Orchestrator:
                     "total_conversations": jr.total_conversations,
                     "completed_conversations": jr.completed_conversations,
                     "error": None,
+                    "boot_id": self.boot_id,
+                })
+            except Exception:
+                pass
+            return jr
+        except asyncio.CancelledError:
+            # Task cancelled externally (via control cancel). Reflect immediately.
+            jr.state = "cancelled"
+            jr.updated_at = _now_iso()
+            try:
+                self._writer.write_job_status(jr.run_id, {
+                    "job_id": jr.job_id,
+                    "run_id": jr.run_id,
+                    "state": jr.state,
+                    "progress_pct": jr.progress_pct,
+                    "total_conversations": jr.total_conversations,
+                    "completed_conversations": jr.completed_conversations,
+                    "error": "cancelled by user",
                     "boot_id": self.boot_id,
                 })
             except Exception:

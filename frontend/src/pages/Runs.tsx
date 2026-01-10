@@ -75,7 +75,6 @@ export default function RunsPage() {
   const [regenMsg, setRegenMsg] = useState<string | null>(null)
 
   // Local persistence helpers (per-vertical)
-  const storageKey = useMemo(() => `runs:last:${vertical}`, [vertical])
   type Prefs = {
     modelSpec?: string
     semanticThreshold?: number
@@ -84,7 +83,8 @@ export default function RunsPage() {
   }
   const loadPrefs = (): Prefs | null => {
     try {
-      const raw = localStorage.getItem(storageKey)
+      const key = `runs:last:${vertical}`
+      const raw = localStorage.getItem(key)
       if (!raw) return null
       const obj = JSON.parse(raw)
       if (obj && typeof obj === 'object') return obj as Prefs
@@ -92,7 +92,10 @@ export default function RunsPage() {
     } catch { return null }
   }
   const savePrefs = (p: Prefs) => {
-    try { localStorage.setItem(storageKey, JSON.stringify(p)) } catch {}
+    try { 
+      const key = `runs:last:${vertical}`
+      localStorage.setItem(key, JSON.stringify(p)) 
+    } catch {}
   }
 
   // Helper: order runs by newest first (chronological desc)
@@ -173,12 +176,7 @@ export default function RunsPage() {
         const preferredModel = prefs?.modelSpec && candidates.includes(prefs.modelSpec) ? prefs.modelSpec : (v.openai_enabled ? `openai:${oai}` : (v.gemini_enabled ? `gemini:${gem}` : `ollama:${oll}`))
         setModelSpec(preferredModel)
         setRecentRuns(orderRuns(runs))
-        // thresholds: prefer persisted, else server defaults
-        const defaultSem = Number(v.semantic_threshold) || 0.8
-        const defaultHall = typeof (v as any).hallucination_threshold === 'number' ? Number((v as any).hallucination_threshold) : 0.8
-        setSemanticThreshold(typeof prefs?.semanticThreshold === 'number' ? prefs!.semanticThreshold! : defaultSem)
-        setHallucinationThreshold(typeof prefs?.hallucinationThreshold === 'number' ? prefs!.hallucinationThreshold! : defaultHall)
-        // Seed metric toggles from persisted settings.metrics if available
+        // Seed metric toggles and thresholds from persisted metrics-config if available
         const cfg = (s && s.metrics && Array.isArray(s.metrics.metrics)) ? s.metrics.metrics : null
         if (cfg) {
           const byName: Record<string, boolean> = {}
@@ -188,6 +186,29 @@ export default function RunsPage() {
           setMetricConsistency(byName['consistency'] ?? true)
           setMetricAdherence(byName['adherence'] ?? true)
           setMetricHallucination(byName['hallucination'] ?? true)
+          // thresholds from metrics-config (override other defaults if present)
+          const semFromMetrics = (() => {
+            const mm = cfg.find((m:any) => String(m?.name) === 'semantic_similarity')
+            const t = (mm && typeof mm.threshold === 'number') ? Number(mm.threshold) : undefined
+            return (typeof t === 'number' && isFinite(t)) ? t : undefined
+          })()
+          const hallFromMetrics = (() => {
+            const mm = cfg.find((m:any) => String(m?.name) === 'hallucination')
+            const t = (mm && typeof mm.threshold === 'number') ? Number(mm.threshold) : undefined
+            return (typeof t === 'number' && isFinite(t)) ? t : undefined
+          })()
+          const defaultSemFromVersion = Number(v.semantic_threshold) || 0.8
+          const defaultHallFromVersion = typeof (v as any).hallucination_threshold === 'number' ? Number((v as any).hallucination_threshold) : 0.8
+          const semCandidate = (typeof semFromMetrics === 'number' ? semFromMetrics : (typeof prefs?.semanticThreshold === 'number' ? prefs!.semanticThreshold! : defaultSemFromVersion))
+          const hallCandidate = (typeof hallFromMetrics === 'number' ? hallFromMetrics : (typeof prefs?.hallucinationThreshold === 'number' ? prefs!.hallucinationThreshold! : defaultHallFromVersion))
+          setSemanticThreshold(semCandidate)
+          setHallucinationThreshold(hallCandidate)
+        } else {
+          // No metrics-config: fall back to version/defaults and persisted prefs
+          const defaultSem = Number(v.semantic_threshold) || 0.8
+          const defaultHall = typeof (v as any).hallucination_threshold === 'number' ? Number((v as any).hallucination_threshold) : 0.8
+          setSemanticThreshold(typeof prefs?.semanticThreshold === 'number' ? prefs!.semanticThreshold! : defaultSem)
+          setHallucinationThreshold(typeof prefs?.hallucinationThreshold === 'number' ? prefs!.hallucinationThreshold! : defaultHall)
         }
         // dataset: prefer persisted if still available
         if (d && d.length) {
@@ -230,7 +251,7 @@ export default function RunsPage() {
       hallucinationThreshold,
       datasetId,
     })
-  }, [modelSpec, semanticThreshold, hallucinationThreshold, datasetId, storageKey])
+  }, [modelSpec, semanticThreshold, hallucinationThreshold, datasetId])
 
   const availableModels = useMemo(() => {
     const arr: { id: string; label: string }[] = []
@@ -264,6 +285,31 @@ export default function RunsPage() {
       const body = await r.json()
       if (!r.ok) throw new Error(body?.detail || 'Failed to start run')
       setStartRes(body)
+      // Sync global metrics config so Metrics page mirrors current selections
+      try {
+        const mr = await fetch('/metrics-config')
+        if (mr.ok) {
+          const cfg = await mr.json()
+          if (cfg && Array.isArray(cfg.metrics)) {
+            const updated = { ...cfg }
+            updated.metrics = (cfg.metrics as any[]).map((m: any) => {
+              const name = String(m?.name || '')
+              const base = { ...m }
+              // align enabled flags to current UI toggles
+              if (name === 'exact_match') base.enabled = !!metricExact
+              if (name === 'semantic_similarity') base.enabled = !!metricSemantic
+              if (name === 'consistency') base.enabled = !!metricConsistency
+              if (name === 'adherence') base.enabled = !!metricAdherence
+              if (name === 'hallucination') base.enabled = !!metricHallucination
+              // apply thresholds
+              if (name === 'semantic_similarity') base.threshold = Number(semanticThreshold)
+              if (name === 'hallucination') base.threshold = Number(hallucinationThreshold)
+              return base
+            })
+            await fetch('/metrics-config', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(updated) })
+          }
+        }
+      } catch {}
       // Seed recent runs with this new job if missing
       setRecentRuns(prev => {
         if (prev.some(r => r.run_id === body.run_id)) return prev
@@ -369,7 +415,8 @@ export default function RunsPage() {
       if (action === 'cancel' || body.state === 'cancelled' || body.state === 'failed' || body.state === 'succeeded') {
         // Stop polling and refresh list to align both views
         if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null }
-        refreshRuns()
+        // Immediate refresh for snappy UX
+        await refreshRuns()
       }
     } catch (e) {
       // ignore for now; poller will reconcile
@@ -469,7 +516,7 @@ export default function RunsPage() {
                             ) : (
                               <Button variant="success" onClick={() => control('resume')}>Resume</Button>
                             )}
-                            <Button variant="danger" onClick={() => control('cancel')}>Abort</Button>
+                            <Button variant="danger" onClick={async () => { await control('cancel'); await refreshRuns() }}>Abort</Button>
                           </div>
                         )}
                       </div>
@@ -558,7 +605,7 @@ export default function RunsPage() {
                                   setStatus(s)
                                   syncRecentWithStatus(s)
                                   if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null }
-                                  refreshRuns()
+                                  await refreshRuns()
                                 }
                               } catch {}
                             }}>Abort</Button>
@@ -574,7 +621,7 @@ export default function RunsPage() {
                                   setStatus(s)
                                   syncRecentWithStatus(s)
                                   if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null }
-                                  refreshRuns()
+                                  await refreshRuns()
                                 }
                               } catch {}
                             }}>Abort</Button>
