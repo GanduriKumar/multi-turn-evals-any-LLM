@@ -429,6 +429,9 @@ class Orchestrator:
                 "model_spec": jr.config.get("model_spec"),
                 "conversations": [],
             }
+            # Accumulate token usage across all turns
+            total_input_tokens = 0
+            total_output_tokens = 0
             # include dataset/domain short description if present
             try:
                 results["domain_description"] = (ds.get("metadata", {}) or {}).get("short_description")
@@ -496,6 +499,49 @@ class Orchestrator:
                         continue
                     out_text = ((rec.get("response", {}) or {}).get("content")) or ""
                     uidx = int(rec.get("turn_index", 0))
+                    # Token accounting from provider metadata when available; otherwise approximate
+                    try:
+                        pm = ((rec.get("response", {}) or {}).get("provider_meta") or {})
+                        usage = pm.get("usage") if isinstance(pm, dict) else None
+                        in_tok = None
+                        out_tok = None
+                        if isinstance(usage, dict):
+                            # OpenAI-style usage
+                            if "prompt_tokens" in usage:
+                                in_tok = int(usage.get("prompt_tokens") or 0)
+                            if "completion_tokens" in usage:
+                                out_tok = int(usage.get("completion_tokens") or 0)
+                            if in_tok is None and "input_tokens" in usage:
+                                in_tok = int(usage.get("input_tokens") or 0)
+                            if out_tok is None and "output_tokens" in usage:
+                                out_tok = int(usage.get("output_tokens") or 0)
+                        # Ollama-style counters
+                        if in_tok is None and isinstance(pm, dict) and "prompt_eval_count" in pm:
+                            try:
+                                in_tok = int(pm.get("prompt_eval_count") or 0)
+                            except Exception:
+                                in_tok = 0
+                        if out_tok is None and isinstance(pm, dict) and "eval_count" in pm:
+                            try:
+                                out_tok = int(pm.get("eval_count") or 0)
+                            except Exception:
+                                out_tok = 0
+                        # Fallback to rough estimates if still missing
+                        if in_tok is None:
+                            try:
+                                ctx_est = int((rec.get("context_audit", {}) or {}).get("token_estimate") or 0)
+                            except Exception:
+                                ctx_est = 0
+                            in_tok = ctx_est
+                        if out_tok is None:
+                            try:
+                                out_tok = max(0, int(len(out_text) / 4.0))
+                            except Exception:
+                                out_tok = 0
+                        total_input_tokens += int(in_tok or 0)
+                        total_output_tokens += int(out_tok or 0)
+                    except Exception:
+                        pass
                     # Robust mapping of user turn index -> assistant turn index in golden
                     # Preferred (convgen_v2): A1=1, A2=3 => assistant_idx = 2*uidx + 1
                     cand_idxs = [2 * uidx + 1, uidx + 1, uidx]
@@ -601,6 +647,11 @@ class Orchestrator:
                 })
 
             # persist results
+            try:
+                results["input_tokens_total"] = int(total_input_tokens)
+                results["output_tokens_total"] = int(total_output_tokens)
+            except Exception:
+                pass
             self._writer.write_results_json(jr.run_id, results)
             try:
                 self._writer.write_results_csv(jr.run_id, results)

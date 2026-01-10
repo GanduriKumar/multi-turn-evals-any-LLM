@@ -20,7 +20,7 @@ This plan defines how to generate datasets with 100% coverage based on Domains �
   - Regulatory/policy blocks: exclude out-of-policy in Happy Path; allow in Adversarial/Trap only (retain 1 per price bin).
   - Skew control: limit extreme combos (high price × out-of-policy × out-of-stock × hard brand) to 1 per Domain × Behavior.
 
-Notes: Support generating one combined dataset+golden covering all scenarios per domain and/or globally; use `difficulty: "mixed"` when combining.
+Notes: Support generating one combined dataset+golden covering all scenarios per domain and/or globally; use `difficulty: "mixed"` when combining. Store under per-vertical paths (e.g., datasets/commerce/...). Use a stable RNG seed and record it in metadata for reproducibility.
 
 ---
 
@@ -68,7 +68,7 @@ Add tests verifying manifest totals and IDs stability across runs. Execute tests
 - Dependency: Prompt 4.
 - Prompt:
 ```
-Implement a parametric conversation generator mapping a scenario (domain, behavior, axes bins) to a dataset conversation and a golden entry. Support multi-turn variants, user corrections, and adversarial prompts. Ensure final outcome decisions align with policy boundary and availability. Include few-shot fixtures per domain.
+Implement a parametric conversation generator mapping a scenario (domain, behavior, axes bins) to a dataset conversation and a golden entry. Support multi-turn variants, user corrections, and adversarial prompts. Ensure final outcome decisions align with policy boundary and availability. Include few-shot fixtures per domain. Record golden constraints needed for adherence checks.
 Add tests validating schema compliance and golden alignment for sampled scenarios. Run tests and show results.
 ```
 
@@ -77,7 +77,7 @@ Add tests validating schema compliance and golden alignment for sampled scenario
 - Dependency: Prompt 5.
 - Prompt:
 ```
-Implement builders to assemble: (a) per-behavior datasets, (b) per-domain combined datasets, and (c) global combined datasets. Use dataset_id conventions, version bumping, and difficulty="mixed" for combined. Ensure golden alignment, no orphan entries, and deduplicate by stable scenario ID.
+Implement builders to assemble: (a) per-behavior datasets, (b) per-domain combined datasets, and (c) global combined datasets. Use dataset_id conventions, version bumping, and difficulty="mixed" for combined. Ensure golden alignment (scoped by dataset_id), no orphan entries, and deduplicate by stable scenario ID. Emit a corresponding golden with entry.final_outcome precedence and constraints for adherence.
 Add tests verifying file contents and referential integrity. Run tests and show results.
 ```
 
@@ -129,7 +129,7 @@ Optimize generation for large counts: batch size controls, streaming writes, and
 - Dependency: Prompt 4.
 - Prompt:
 ```
-Implement reporting utilities that compute coverage stats and export CSV and HTML dashboards, including per-domain/behavior heatmaps and exclusion breakdowns. Add snapshot tests for report contents. Run tests and show results.
+Implement reporting utilities that compute coverage stats and export CSV and HTML dashboards, including per-domain/behavior heatmaps and exclusion breakdowns. Include token/cost budget estimators based on average turns and configured model rates if provided. Add snapshot tests for report contents. Run tests and show results.
 ```
 
 ### Prompt 13: Governance & Docs

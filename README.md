@@ -15,7 +15,7 @@ Key capabilities
 - Metrics: exact, semantic (via local embeddings), consistency, adherence, hallucination
 	- Semantic uses Ollama embeddings; set `EMBED_MODEL` (e.g., `nomic-embed-text`) and `OLLAMA_HOST`
 	- Quick check endpoint: `GET /embeddings/test`
-- Reports: HTML/CSV/JSON with conversation identity (slug/title/metadata), per‑turn snippets, rollups
+- Reports: HTML/CSV/JSON with conversation identity (slug/title/metadata), per‑turn snippets, rollups, token totals
 - Compare two runs: `GET /compare?runA=&runB=`
 - Persistence: filesystem (`runs/`)
 
@@ -28,9 +28,24 @@ What’s new recently
 - Metrics config persisted to `configs/metrics.json` and respected across UI and backend
 - Rebuild endpoint to enrich old runs: `POST /runs/{run_id}/rebuild`
 - Dataset schema additions: conversation `title` and `metadata.short_description`
+- Report revamp: overview donut charts, failure tables, stacked summary
+- Token accounting: Input/Output tokens aggregated per run; shown in HTML report and exported in CSV
+- HTML artifact filenames: `report-{domain}-{behavior}-{model}.html`
+- PDF backend fallbacks (WeasyPrint → Playwright → wkhtmltopdf); UI PDF button removed pending env readiness
+- Runs page ring color reflects state (green success, red fail/cancel, amber otherwise)
+- Prompt/context optimization: last 5 turns; budgets ~1800 input tokens, 400 max completion tokens
 
 Getting started
 - See `UserGuide.md` for end‑to‑end setup and usage.
+
+Notes
+- HTML report now includes:
+	- Overview with conversation and turn pass donuts
+	- Token usage totals (Input/Output)
+	- Failure explanations tables (conversation and turn level)
+	- Detailed per‑conversation metrics
+- CSV adds `input_tokens_total` and `output_tokens_total` columns.
+- PDF generation is supported by backend if dependencies are present, but the UI hides the button by default.
 
 License
 - Licensed under GNU GPL v3. See `LICENSE`.

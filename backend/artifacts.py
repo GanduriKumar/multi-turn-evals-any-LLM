@@ -126,11 +126,15 @@ class RunArtifactWriter:
                 "adherence_pass", "hallucination_pass", "consistency_pass",
                 # rollup
                 "turn_pass",
+                # run-level token totals (repeated per row)
+                "input_tokens_total", "output_tokens_total",
             ]
             writer.writerow(header)
             run_id_val = results.get("run_id")
             dataset_id = results.get("dataset_id")
             model_spec = results.get("model_spec")
+            in_tokens_total = results.get("input_tokens_total")
+            out_tokens_total = results.get("output_tokens_total")
             dom_desc = results.get("domain_description")
             for conv in results.get("conversations", []) or []:
                 cid = conv.get("conversation_id")
@@ -192,6 +196,8 @@ class RunArtifactWriter:
                         bool(ad.get("pass")), bool(ha.get("pass")), bool(co.get("pass")),
                         # rollup
                         bool(tpass),
+                        # run-level token totals
+                        in_tokens_total, out_tokens_total,
                     ]
                     writer.writerow(row)
         return path

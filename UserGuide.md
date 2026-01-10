@@ -57,132 +57,129 @@ Example: Install Ollama and pull a model
 ---
 
 ## Start the app (dev)
+# User Guide — Multi‑Turn LLM Evaluation System (MVP)
+
+Welcome! This guide will help you install, run, and use the Multi‑Turn LLM Evaluation System. It uses simple language and walks you through the key features step‑by‑step.
 
 Use the provided script to run both backend and frontend together:
-- Run: `.\\scripts\\dev.ps1`
-
-This will:
+This app lets you evaluate Large Language Models (LLMs) on multi‑turn conversations. You can:
+ Upload datasets (conversations) and matching golden files (expected answers).
+- Choose a model (local Ollama, Google Gemini, or OpenAI).
 - Start backend API at http://localhost:8000
 - Start frontend at http://localhost:5173
-
-If you prefer manually:
-- Backend (from repo root):
-  - Ensure you run from the repo root so imports work
-  - `python -m uvicorn backend.app:app --host 0.0.0.0 --port 8000`
-- Frontend:
-  - `cd frontend`
+ Windows 10/11 (PowerShell)
+ Python 3.12 (recommended) with virtual environment
+ Node.js 18+ and npm
+ Optional for LLMs (choose any):
+  - Ollama running locally (default host http://localhost:11434) with model `OLLLAMA_MODEL` (default `llama3.2:latest`)
+  - Google Gemini API Key (for model `GEMINI_MODEL`, default `gemini-2.5`)
+  - OpenAI API Key (for model `OPENAI_MODEL`, default `gpt-5.1`)
   - `npm run dev`
 
-Tip (Windows): avoid --reload when starting uvicorn for this project.
+ 1) Clone or open the repo folder in VS Code.
 
-CI (GitHub Actions):
-- Push or open a PR to trigger the workflow at `.github/workflows/ci.yml`.
-- It runs backend Python tests and frontend Vitest.
-
----
+ 2) Python environment (from repo root):
+ - Create and activate a virtual environment, then install backend dependencies
+   - `python -m venv .venv`
+   - `.\\.venv\\Scripts\\Activate.ps1`
+   - `pip install -r backend/requirements.txt`
 
 ## Quick smoke test
-
-- Run: `.\\scripts\\smoke.ps1`
+ Use the provided script to run both backend and frontend together:
+ - Run: `.\\scripts\\dev.ps1`
 - It will check /health and /datasets on the backend.
 
----
-
+ - Run: `.\\scripts\\smoke.ps1`
+ - It will check /health and /datasets on the backend.
 ## Using the UI
 
-Open http://localhost:5173 in your browser.
 
 ### 1. Datasets Viewer
-- Upload a dataset (.dataset.json) and optional golden (.golden.json).
-- Files are validated on the server and saved under the repo `datasets/` folder.
-- The table shows: dataset id, version, domain, difficulty, number of conversations, and validation status.
+ Open http://localhost:5173 in your browser.
 
 Tips and examples:
-- File naming is handled by the server using the dataset_id. If your dataset JSON contains `"dataset_id": "banking_easy"`, the saved files will be:
-  - `datasets/banking_easy.dataset.json`
-  - `datasets/banking_easy.golden.json`
+ Choose a dataset and a model.
 - You can also place files manually in `datasets/`. Use the same naming convention.
 
-Example dataset entry (short):
-```json
-{
-  "dataset_id": "commerce_easy",
-  "version": "1.0.0",
-  "metadata": { "domain": "commerce", "difficulty": "easy" },
-  "conversations": [
+ Select a run to view a summary.
+ Download results as JSON/CSV, or open the HTML report.
+ - Submit human feedback (rating, notes). Optionally override conversation‑level pass/fail or a specific turn’s pass/fail. Feedback is stored at `runs/<run_id>/feedback.json` and does not change auto‑scores.
+ - Examples:
+ - Download JSON: opens `runs/<run_id>/results.json`.
+ - Download CSV: opens `runs/<run_id>/results.csv`.
+ - Open Report: generates and opens `runs/<run_id>/report-<domain>-<behavior>-<model>.html` when metadata is available.
     {
       "conversation_id": "conv42",
-      "turns": [
-        { "role": "user", "text": "I need a refund for order 123" },
-        { "role": "assistant", "text": "Please share your order ID." }
-      ]
-    }
-  ]
-}
+ Configure providers and thresholds:
+ - OLLAMA_HOST
+ - GOOGLE_API_KEY, OPENAI_API_KEY
+ - Semantic threshold
+ - Default models: OLLAMA_MODEL, GEMINI_MODEL, OPENAI_MODEL
+ - EMBED_MODEL for semantic similarity
+ These settings are saved to a local `.env` at the repo root and loaded at startup. Restart backend after changes.
 ```
 
-Example golden entry (matching assistant turns by index):
-```json
+ Enable/disable metrics and adjust weights/thresholds.
+ Saved to `configs/metrics.json`.
 {
   "dataset_id": "commerce_easy",
-  "version": "1.0.0",
-  "entries": [
-    {
+ Create evaluation datasets automatically using the configured strategy.
+ Optionally save generated datasets and goldens to disk.
+ Located as the first item in the navigation bar.
       "conversation_id": "conv42",
       "turns": [
-        { "turn_index": 1, "expected": { "variants": ["Please share your order ID.", "Provide order id, please."] } }
       ],
       "final_outcome": { "decision": "ALLOW", "next_action": "issue_refund" }
-    }
-  ]
-}
-```
-
-### 2. Runs page
-- Choose a dataset and a model.
-- Choose metrics (exact, semantic, consistency, adherence, hallucination) and set the semantic threshold.
+ backend/ — FastAPI app and evaluation engine
+ frontend/ — React + Vite UI
+ configs/schemas/ — JSON Schemas (dataset, golden, run_config)
+ datasets/<vertical>/ — Your datasets and golden files (per industry vertical)
+ runs/<vertical>/ — Generated run artifacts (results.json, results.csv, report.html, per‑turn JSON)
+ scripts/ — Helper scripts (dev.ps1, smoke.ps1)
+ docs/ — Additional documentation
+ - docs/GOVERNANCE.md — Coverage governance & versioning guide (Prompt 13)
 - Click Start Run. You’ll see live progress and completion status.
 
-Notes and examples:
-- Semantic scoring uses local embeddings (via Ollama). Configure in Settings:
-  - OLLAMA_HOST (e.g., http://localhost:11434)
-  - EMBED_MODEL (e.g., `nomic-embed-text`)
-  - Test endpoint: `GET /embeddings/test`
-
-Example run configuration sent by the UI:
-```json
-{
-  "dataset_id": "demo",
-  "model_spec": "ollama:llama3.2:latest",
-  "metrics": ["exact_match", "semantic_similarity", "consistency", "adherence", "hallucination"],
-  "thresholds": { "semantic_threshold": 0.8 }
-}
-```
-
-What to expect:
-- The job appears with a job id like `job-0001`.
-- Progress shows completed conversations out of total.
-- When finished, a run id is created deterministically (dataset + version + model + config hash).
-
-### 3. Reports page
-- Select a run to view a summary.
-- Download results as JSON/CSV, or open the HTML report.
-– Submit human feedback (rating, notes). Optionally override conversation‑level pass/fail or a specific turn’s pass/fail. Feedback is stored at `runs/<run_id>/feedback.json` and does not change auto‑scores.
-
-Examples:
+ Common endpoints:
+ - GET /health — basic status
+ - GET /version — version, provider flags, and default models
+ - GET /datasets — list datasets (accepts `?vertical=`)
+ - POST /datasets/upload — upload dataset and optional golden
+ - GET /datasets/{dataset_id} — get dataset JSON
+ - GET /goldens/{dataset_id} — get golden JSON
+ - POST /datasets/save — validate and write dataset/golden
+ - POST /validate — validate JSON against schemas (dataset/golden/run_config)
+ - POST /runs — start a run (UI passes context.vertical)
+ - GET /runs — list runs (accepts `?vertical=`)
+ - GET /runs/{job_id}/status — live job status
+ - GET /runs/{run_id}/results — get results.json (accepts `?vertical=`)
+ - GET /runs/{run_id}/artifacts?type=json|csv|html — download/export (HTML includes token totals; CSV includes input_tokens_total/output_tokens_total)
+ - POST /runs/{run_id}/feedback — append human feedback
+ - GET /compare?runA=&runB= — compare run summaries
+ - GET /settings — read settings (providers, models, embedding)
+ - POST /settings — update .env (dev only)
+ - GET /embeddings/test — verify embedding endpoint/model
+ - GET/POST /metrics-config — read/write metrics configuration
+ - GET /coverage/taxonomy — list domains and behaviors
+ - GET /coverage/manifest — preview counts per domain×behavior pair (query params: domains, behaviors)
+ - POST /coverage/generate — generate datasets/goldens (combined or split) with options to save (stores under `datasets/<vertical>/`)
+ - POST /coverage/generate (as_array=true) — emit a single JSON array with the combined scenario schema (Prompt 14)
+ - GET /coverage/report.csv?type=summary|heatmap — download CSV reports
+ - POST /coverage/per-turn.csv — generate a per-turn CSV for a dataset/golden payload
+ - GET/POST /coverage/settings — read/write coverage strategy (pairwise/exhaustive, budgets, sampler overrides; Prompt 13)
 - Download JSON: opens `runs/<run_id>/results.json`.
 - Download CSV: opens `runs/<run_id>/results.csv`.
-- Open Report: generates and opens `runs/<run_id>/report.html` (rendered from results).
-
-### 4. Settings page
+ ModuleNotFoundError: No module named 'backend'
+ - Start backend from repo root, or run .\scripts\dev.ps1 which sets PYTHONPATH.
+ - Avoid using --reload on Windows; it can break imports.
 - Configure providers and thresholds:
   - OLLAMA_HOST
-  - GOOGLE_API_KEY, OPENAI_API_KEY
-  - Semantic threshold
-  - Default models: OLLAMA_MODEL, GEMINI_MODEL, OPENAI_MODEL
-  - EMBED_MODEL for semantic similarity
-– These settings are saved to a local `.env` at the repo root and loaded at startup. Restart backend after changes.
-
+ Dataset (.dataset.json)
+ - Fields: dataset_id, version, metadata { domain, difficulty, tags? }, conversations [ { conversation_id, turns: [{ role, text }] } ]
+ - Golden (.golden.json)
+ - Fields: dataset_id, version, entries [ { conversation_id, turns: [{ turn_index, expected { variants: string[] } }], final_outcome, constraints? } ]
+ - Run results (results.json)
+ - Summary per conversation with per‑turn metrics and overall pass/fail.
 Example `.env` file:
 ```
 OLLAMA_HOST=http://localhost:11434
@@ -212,12 +209,12 @@ Example `configs/metrics.json` structure:
     { "name": "hallucination", "enabled": true, "weight": 1.0 }
   ]
 }
-```
-
+ See CONTRIBUTING.md for coding standards and tests. For governance/versioning of coverage rules, see `docs/GOVERNANCE.md`.
+ License: GPLv3 (see LICENSE).
 ### 6. Dataset Generator page (formerly “Coverage Generator”)
 - Create evaluation datasets automatically using the configured strategy.
-- Optionally save generated datasets and goldens to disk.
-- Located as the first item in the navigation bar.
+ Open an issue in the repository.
+ Or ask in your team chat with a link to this guide.
 
 Tips:
 - Preview coverage first, then enable “Save to server” to write files.

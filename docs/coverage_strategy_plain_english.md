@@ -70,7 +70,7 @@ In 60 seconds
    - Why this works: Most real problems appear when two things interact (e.g., “out‑of‑stock” AND “near policy limit”). Testing each pair catches the majority of issues with far fewer tests.
    - Simple analogy: Car testing—don’t drive every possible road+weather+tire+fuel combo. Ensure each pair shows up (rain+snow tires, highway+diesel, etc.). You still find key issues.
 
-- Keep the risky stuff heavy
+- Keep the risky stuff heavy (risk-weighted sampling)
    - We keep more tests where mistakes are costly or likely: policy edges, out‑of‑stock, high price sensitivity.
    - We keep fewer in the “routine” zone (in‑stock and within policy).
 
@@ -83,14 +83,17 @@ In 60 seconds
 - Keep the same guardrails
    - We still block impossible or irrelevant cases. Business rules remain intact.
 
-- Predictable budgets
+- Predictable budgets and per-behavior caps
    - Set simple caps like “≤100 tests per domain” or “≤20 per behavior.” We fit inside these budgets while meeting pairwise coverage and risk priorities.
+      - For Commerce, an effective default is ~100 scenarios/behavior (configurable) with domain floors (≥3/domain) and allocation ~50 High, ~35 Medium, ~15 Low risk.
+      - Use a stable RNG seed for reproducibility and to support comparison across runs.
 
 - Why this doesn’t lose the coverage that matters
    - Guarantees: Every pair of dial values is still tested.
    - Focus: Risky/policy‑sensitive cases stay in.
    - Safety net: Anchors always run; sensitive areas can use 3‑way.
    - Oversight: We monitor results; if we see misses, we dial up locally.
+      - Storage: Datasets and runs are separated per industry vertical to keep scope clear and reports comparable.
 
 3) What leaders should expect
 - Today: ~600 tests/domain → New: ~90–120 tests/domain (pairwise + anchors + risky cases).

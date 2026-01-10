@@ -160,7 +160,7 @@ Execute tests and show results.
 Implement aggregation/reporting that:
 - Computes conversation-level success (A2) and shows turn-level metrics.
 - Provides rollups by domain, behavior, risk tier, and axis bins; trend by run.
-- Exports CSV/JSON with stable schemas.
+- Exports CSV/JSON with stable schemas and records run-level token totals (input_tokens_total, output_tokens_total) aggregated across turns.
 - Applies the gating rule: conversation passes only if final outcome passes AND no high-severity violations on any assistant turn.
 Add tests for aggregation correctness and schema stability.
 Execute tests and show results.
@@ -174,6 +174,7 @@ Execute tests and show results.
 Add settings to control:
 - Strategy: Risk-weighted (M: 100/behavior), RNG seed (default 42), domain floor (min 3/domain).
 - Semantic threshold (default 0.8) and hallucination threshold.
+- Context window: last 5 turns; input budget ~1800 tokens; max completion tokens ~400.
 - Dataset path convention: datasets/commerce/<behavior>/<version>/<slug>.json and versioning (default 1.0.0).
 Include validation and persistence; add tests for API and UI.
 Execute tests and show results.
@@ -199,7 +200,7 @@ Execute tests and show results.
 ```
 Set up CI to run tests and lint on push/PR. Add documentation covering:
 - Taxonomy, risk tiers, dataset generation strategy (risk-weighted M), and seeding.
-- Unified system prompt, multi-turn flow (clarify → correct), metrics (similarity 0.8, policy adherence, hallucination heuristic).
+- Unified system prompt, multi-turn flow (clarify → correct), metrics (similarity 0.8, policy adherence, hallucination heuristic), token accounting (input/output totals), and report visualizations (donuts + token card).
 - Dataset schema, paths, and versioning.
 Defer cross-provider comparison to a later iteration.
 Run CI locally and show results.
@@ -215,6 +216,13 @@ Conventions (confirmed):
 - Multi-turn: U1 → A1(clarify) → U2 → A2(final); pass requires final outcome pass + no severe violations on any assistant turn
 - Dataset path: datasets/commerce/<behavior>/<version>/<slug>.json
 - scenario_id: deterministic slug with hash; version 1.0.0; seed 42
+
+Golden Matching Rules (explicit):
+- Scope golden by dataset_id and conversation_id.
+- Prefer entry.final_outcome and entry.constraints; fall back to top-level when missing.
+- Map assistant turn index from user turn index with preference order: 2*uidx+1 → uidx+1 → uidx.
+- Use variants for exact/semantic checks on the mapped assistant index only.
+- Enforce outcome-first gating with high-severity violations across all assistant turns.
 
 Download link:
 file:///c:/Users/kumar.gn/PycharmProjects/Testproject/docs/multi_turn_evals_implementation_plan_v2.md

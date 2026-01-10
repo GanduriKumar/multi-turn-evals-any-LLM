@@ -4,12 +4,12 @@ This plan follows the Interview‑First approach: clear, atomic prompts you can 
 
 Personas: QA evaluator, Product analyst
 Key workflows: upload dataset (JSON), select LLM, configure/run evaluation, view per‑turn report, export CSV, submit human feedback, compare runs
-Providers/models: Ollama (llama3.2:latest), Gemini (gemini-2.5; auto‑disable if GOOGLE_API_KEY missing)
+Providers/models: Ollama (llama3.2:latest), Gemini (gemini-2.5; auto‑disable if GOOGLE_API_KEY missing), OpenAI (gpt‑5.x; auto‑disable if OPENAI_API_KEY missing)
 Embeddings: Ollama nomic-embed-text (cosine threshold 0.80) for semantic similarity
 Datasets/goldens: JSON only, multiple acceptable variants per turn, pure text, outcome schema {decision, refund_amount?, reason_code?, next_action?, policy_flags?}
-Context policy: state object + last 4 turns
+Context policy: state object + last 5 turns; approximate token budget ~1800 for context; max completion tokens ~400
 Metrics: per‑turn exact + semantic; consistency; adherence; hallucination; conversation pass/fail via outcome‑first rule; regression deferred
-Persistence: filesystem only; run artifacts JSON + CSV
+Persistence: filesystem only; per‑vertical storage under datasets/<vertical>/ and runs/<vertical>/; run artifacts JSON + CSV (+ HTML generated on demand)
 Frontend: React + Vite + TypeScript + Tailwind + React Router; Google brand palette; card layout with borders; NavBar pages (Datasets, Runs, Reports, Settings, Golden Editor, Metrics, Golden Generator)
 
 ---
@@ -101,13 +101,13 @@ Frontend: React + Vite + TypeScript + Tailwind + React Router; Google brand pale
   Use regex/entity rules, not LLMs. Provide unit tests with fixtures. Run tests and show results.
   """
 
-### Prompt 8: Context Builder (State + Last 4 Turns)
+### Prompt 8: Context Builder (State + Last 5 Turns + Budget)
 - What it implements: Composes model input context per turn.
 - Dependency: Prompt 7.
 - Prompt:
   """
-  Implement a context builder that takes the accumulated state object and the last 4 raw turns, returning a structured prompt for the provider adapters.
-  Include safeguards for token budget (simple clipping) and logging for audit.
+  Implement a context builder that takes the accumulated state object and the last 5 raw turns, returning a structured prompt for the provider adapters.
+  Include safeguards for a total input token budget (~1800, configurable), simple clipping, and audit fields (approx token_estimate and params like max_tokens/max_completion_tokens).
   Add tests. Execute tests and show results.
   """
 
@@ -166,22 +166,29 @@ Frontend: React + Vite + TypeScript + Tailwind + React Router; Google brand pale
   Add unit tests and execute them.
   """
 
-### Prompt 14: Persistence & Artifacts (JSON + CSV)
+### Prompt 14: Persistence & Artifacts (JSON + CSV + Vertical Layout)
 - What it implements: Run folder layout and writers.
 - Dependency: Prompt 10.
 - Prompt:
   """
-  Define a run‑specific folder structure under runs/<run_id>/.
-  Persist: inputs, per‑turn outputs, scores, logs, a machine‑readable results.json, and a tabular export results.csv.
+  Define a per‑vertical folder structure under runs/<vertical>/<run_id>/.
+  Persist: inputs, per‑turn outputs, scores, logs, a machine‑readable results.json, a tabular export results.csv, and generate report.html on demand.
+  Use short, hashed conversation subfolders on Windows to avoid MAX_PATH when needed.
+  Record run‑level token totals in results.json: input_tokens_total and output_tokens_total (aggregated from provider metadata with sensible fallbacks). Append these totals as columns to results.csv.
   Implement writers and readers. Add tests and show results.
   """
 
-### Prompt 15: Reports (Human‑Reviewable)
+### Prompt 15: Reports (Human‑Reviewable, Visual Overview)
 - What it implements: HTML/JSON report with diffs and evaluator fields.
 - Dependency: Prompt 14.
 - Prompt:
   """
-  Generate a human‑readable HTML report per run including transcript, expected vs actual per turn, metric breakdowns, pass/fail flags, and string diffs.
+  Generate a human‑readable HTML report per run including:
+  - Visual Overview: donut charts for conversation and turn pass rates; token usage totals (input/output)
+  - Run Summary (stacked fields including dataset, model, token totals)
+  - Failure Explanations tables (conversation‑level and turn‑level with clearer reasons)
+  - Detailed per‑conversation snippets and per‑turn metrics
+  Name the HTML artifact as report-{domain}-{behavior}-{model}.html when metadata is available.
   Include evaluator fields: rating, notes, override pass/fail. Persist feedback JSON linked to run ID.
   Add tests for report generation. Run tests and show results.
   """
@@ -197,7 +204,7 @@ Frontend: React + Vite + TypeScript + Tailwind + React Router; Google brand pale
   - POST /runs (start evaluation)
   - GET /runs/{id}/status (progress)
   - GET /runs/{id}/results (per‑turn outputs, scores)
-  - GET /runs/{id}/artifacts (download JSON/CSV/report bundle)
+  - GET /runs/{id}/artifacts (type=json|csv|html|pdf) with vertical selection; HTML generated on demand; PDF supported with fallbacks (WeasyPrint → Playwright → wkhtmltopdf) if present
   - POST /runs/{id}/feedback (submit human evaluation)
   - GET /compare?runA=&runB= (simple side‑by‑side summary)
   Add OpenAPI docs and error handling. Include API tests. Run tests and show results.
@@ -250,8 +257,26 @@ Frontend: React + Vite + TypeScript + Tailwind + React Router; Google brand pale
 - Prompt:
   """
   Build a Runs page to select dataset(s), model (Ollama llama3.2:latest or Gemini gemini-2.5), thresholds, and start a run.
-  Show live progress with job state and per‑conversation status.
+  Show live progress with job state and per‑conversation status. Use a status ring whose color reflects state (green: succeeded; red: failed/cancelled; amber: running/paused).
   Add UI tests and run them.
+
+  ---
+
+  Golden Matching Rules (explicit)
+  - Dataset ↔ Golden scoping:
+    - Golden lookup is scoped by dataset_id and conversation_id to avoid cross‑dataset collisions.
+    - Prefer golden.entry fields; fall back to top‑level when entry.* absent.
+  - Assistant turn index mapping (user → assistant):
+    - Preferred mapping: assistant_idx = 2*user_idx + 1 (U1=0 → A1=1; U2=2 → A2=5 in fully interleaved logs).
+    - Fallbacks (for older assets): try user_idx+1, then user_idx.
+  - Per‑turn variant matching:
+    - exact: case/whitespace‑normalized equality against any expected.variants for the mapped assistant index.
+    - semantic: cosine similarity vs expected.variants; use max score; pass if ≥ threshold.
+  - Final outcome precedence and gating:
+    - final_outcome = entry.final_outcome if present else top‑level final_outcome.
+    - Conversation passes only if final outcome matches expectations AND no high‑severity violations (e.g., adherence/hallucination) on any assistant turn.
+  - Constraints for adherence metric:
+    - Use entry.constraints (or top‑level constraints) to check policy adherence; include reasons and flags in failures.
   """
 
 ### Prompt 22: Reports Page (Per‑Turn + CSV + Compare)
