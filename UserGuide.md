@@ -275,7 +275,11 @@ Common endpoints:
 - ModuleNotFoundError: No module named 'backend'
   - Start backend from repo root, or run .\scripts\dev.ps1 which sets PYTHONPATH.
   - Avoid using --reload on Windows; it can break imports.
-
+Non-deterministic results (flip-flopping scores)
+- System now uses temperature=0.0 and seed=42 by default for deterministic outputs.
+- If you see variations, ensure you're using the same model version (some providers may update models).
+- Embeddings are cached per run to ensure consistent semantic scores.
+- To change seed or temperature, pass params_override in run config context.params.
 - Frontend cannot reach backend
   - Ensure backend is running on http://localhost:8000.
   - Vite dev server proxies API calls automatically, including /coverage endpoints.

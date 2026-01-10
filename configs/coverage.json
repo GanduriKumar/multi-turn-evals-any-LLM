@@ -1,6 +1,6 @@
 {
   "mode": "pairwise",
-  "t": 3,
+  "t": 6,
   "per_behavior_budget": 100,
   "anchors": [
     {

@@ -38,7 +38,9 @@ def _clip_text_to_tokens(text: str, max_tokens: int) -> Tuple[str, bool]:
 
 def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any], max_tokens: int = 1800, conv_meta: Optional[Dict[str, Any]] = None, params_override: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Build provider-ready messages from state + last 4 turns with a simple token budget safeguard.
+    Build provider-ready messages from state + fixed last 5 turns.
+    Deterministic clipping: allocate a static token cap to the system message and
+    an even cap to each of the included turns. No messages are dropped.
     Returns { messages: [...], audit: {...} }.
     """
     # last 5 raw turns to preserve more context
@@ -89,20 +91,26 @@ def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any
         content = t.get("text", "")
         messages.append({"role": role, "content": content})
 
-    # apply a simple budget: clip per-message content (do not drop messages)
+    # Deterministic clipping: static caps (system gets a fixed share; turns share the rest)
     truncated = False
     total = 0
-    budget = max_tokens
     new_messages: List[Dict[str, str]] = []
-    for m in messages:
+    msg_count = len(messages)
+    if msg_count <= 0:
+        return {"messages": [], "audit": {"used_turn_count": 0, "truncated": False, "token_estimate": 0, "max_tokens": max_tokens}, "params": sys_params}
+
+    # Allocate ~35% to system, remainder evenly across turns; enforce a sane per-message floor
+    system_cap = int(max_tokens * 0.35)
+    if msg_count == 1:
+        caps = [max_tokens]
+    else:
+        per_turn_cap = max(16, (max_tokens - system_cap) // (msg_count - 1))
+        caps = [system_cap] + [per_turn_cap] * (msg_count - 1)
+
+    for m, cap in zip(messages, caps):
         content = m["content"]
-        # leave at least 1 token per remaining message
-        remaining_msgs = len(messages) - len(new_messages)
-        # naive fair-share budget
-        fair = max(16, budget // max(1, remaining_msgs))
-        clipped, did = _clip_text_to_tokens(content, fair)
+        clipped, did = _clip_text_to_tokens(content, cap)
         total += approx_tokens(clipped)
-        budget = max(0, budget - approx_tokens(clipped))
         truncated = truncated or did
         new_messages.append({"role": m["role"], "content": clipped})
 
@@ -111,6 +119,7 @@ def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any
         "truncated": truncated,
         "token_estimate": total,
         "max_tokens": max_tokens,
+        "context_mode": "deterministic_fixed5",
     }
 
     return {"messages": new_messages, "audit": audit, "params": sys_params}

@@ -24,10 +24,11 @@ class OpenAIProvider:
         t0 = time.perf_counter()
         url = f"{self.base_url}/chat/completions"
         # Allow upstream to pass decoding params via a synthetic system message metadata if present.
-        # Back-compat: default temperature=0.2, max_tokens=512
-        temperature = 0.2
+        # Back-compat: default temperature=0.0 for determinism, max_tokens=512
+        temperature = 0.0
         max_tokens = 512
         top_p = 1.0
+        seed = None
         try:
             # If the first message is system, we may have params in metadata of the request, but
             # ProviderRequest doesn't define params; we rely on a convention: last message may include params in content audit.
@@ -37,6 +38,8 @@ class OpenAIProvider:
                 temperature = float(p.get("temperature", temperature))
                 max_tokens = int(p.get("max_tokens", max_tokens))
                 top_p = float(p.get("top_p", top_p))
+                if "seed" in p and p["seed"] is not None:
+                    seed = int(p["seed"])
         except Exception:
             pass
         # Newer OpenAI models (e.g., gpt-5.x) expect 'max_completion_tokens' instead of 'max_tokens'
@@ -47,6 +50,9 @@ class OpenAIProvider:
             "top_p": top_p,
             "max_completion_tokens": max_tokens,
         }
+        # Add seed for deterministic sampling if provided
+        if seed is not None:
+            payload["seed"] = seed
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",

@@ -34,6 +34,7 @@ What’s new recently
 - PDF backend fallbacks (WeasyPrint → Playwright → wkhtmltopdf); UI PDF button removed pending env readiness
 - Runs page ring color reflects state (green success, red fail/cancel, amber otherwise)
 - Prompt/context optimization: last 5 turns; budgets ~1800 input tokens, 400 max completion tokens
+- Deterministic evaluation: temperature=0.0, seed=42 for reproducible results across runs
 
 Getting started
 - See `UserGuide.md` for end‑to‑end setup and usage.

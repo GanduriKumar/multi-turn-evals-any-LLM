@@ -15,13 +15,16 @@ class OllamaProvider:
     async def chat(self, req: ProviderRequest) -> ProviderResponse:
         t0 = time.perf_counter()
         url = f"{self.base_url}/api/chat"
-        temperature = 0.2
+        temperature = 0.0  # Set to 0 for deterministic outputs
         top_p = 1.0
+        seed = None
         try:
             p = (req.metadata or {}).get("params")
             if isinstance(p, dict):
                 temperature = float(p.get("temperature", temperature))
                 top_p = float(p.get("top_p", top_p))
+                if "seed" in p and p["seed"] is not None:
+                    seed = int(p["seed"])
         except Exception:
             pass
         payload = {
@@ -33,6 +36,9 @@ class OllamaProvider:
                 "top_p": top_p,
             }
         }
+        # Add seed for deterministic sampling if provided (Ollama supports seed)
+        if seed is not None:
+            payload["options"]["seed"] = seed
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
                 r = await client.post(url, json=payload)

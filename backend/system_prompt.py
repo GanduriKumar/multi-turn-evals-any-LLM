@@ -4,11 +4,12 @@ from typing import Any, Dict
 
 
 DEFAULT_PARAMS = {
-    "temperature": 0.2,
+    "temperature": 0.0,  # Set to 0 for deterministic outputs
     "max_tokens": 400,
     "top_p": 1.0,
     "presence_penalty": 0,
     "frequency_penalty": 0,
+    "seed": 42,  # Fixed seed for reproducibility
 }
 
 
