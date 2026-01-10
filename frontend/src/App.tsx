@@ -44,10 +44,10 @@ function Layout({ children }: { children: React.ReactNode }) {
                 // Move Dataset Generator to the first position
                 { to: '/coverage', label: 'Dataset Generator', color: 'warning' },
                 { to: '/datasets', label: 'Datasets Viewer', color: 'success' },
+                { to: '/metrics', label: 'Metrics', color: 'primary' },
+                { to: '/settings', label: 'LLM Settings', color: 'danger' },
                 { to: '/runs', label: 'Runs', color: 'primary' },
                 { to: '/reports', label: 'Reports', color: 'warning' },
-                { to: '/settings', label: 'Settings', color: 'danger' },
-                { to: '/metrics', label: 'Metrics', color: 'primary' },
                 // Golden Generator deprecated/hidden per scope
               ]
               const cls = (color: Color, _isActive: boolean) => {

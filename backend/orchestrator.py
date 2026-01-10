@@ -476,11 +476,16 @@ class Orchestrator:
                 try:
                     g = self.repo.get_golden(cid)
                     golden_entry = {t.get("turn_index"): (t.get("expected", {}) or {}).get("variants", []) for t in (g.get("entry", {}).get("turns", []) or [])}
-                    golden_outcome = g.get("entry", {}).get("final_outcome", {}) or {}
-                    if not golden_outcome:
-                        golden_outcome = g.get("final_outcome", {}) or {}
+                    # Properly handle final_outcome: prefer entry.final_outcome, fallback to top-level final_outcome
+                    entry_outcome = g.get("entry", {}).get("final_outcome")
+                    if entry_outcome is not None:
+                        golden_outcome = entry_outcome
+                    else:
+                        golden_outcome = g.get("final_outcome") or {}
                     golden_constraints = g.get("entry", {}).get("constraints") or g.get("constraints")
-                except Exception:
+                except Exception as e:
+                    import sys
+                    print(f"[DEBUG] Failed to load golden for {cid}: {e}", file=sys.stderr)
                     pass
 
                 last_state: Dict[str, Any] = {}

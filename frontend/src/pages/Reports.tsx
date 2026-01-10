@@ -49,7 +49,15 @@ export default function ReportsPage() {
     setLoading(true); setError(null)
     try {
       const r = await fetch(`/runs/${id}/results?vertical=${encodeURIComponent(vertical)}`)
-      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      if (!r.ok) {
+        if (r.status === 404) {
+          // Friendly message when a run has no generated report yet
+          setResults(null)
+          setError('No report found for this run.')
+          return
+        }
+        throw new Error(`HTTP ${r.status}`)
+      }
       const js = await r.json()
       setResults(js)
     } catch (e:any) {

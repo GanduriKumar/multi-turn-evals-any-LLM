@@ -4,6 +4,7 @@ from typing import Any, Dict, Tuple
 
 from .policy_facts import load_policy_and_facts
 from .canonical_a2_lib import compose_canonical_a2
+import re
 
 
 def _hash_id(s: str) -> str:
@@ -44,7 +45,12 @@ def build_records(
     seed: int = 42,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     policy_text, facts_text = load_policy_and_facts(domain, axes, seed)
-    convo_id = f"{domain}.{behavior}." + ",".join(f"{k}={v}" for k, v in axes.items()) + f".{_hash_id(domain+behavior+str(axes))}"
+    def _slug(s: str) -> str:
+        # lower, replace non-alphanum with '-', collapse repeats, trim dashes
+        s2 = re.sub(r"[^A-Za-z0-9._-]+", "-", s.strip().lower())
+        s2 = re.sub(r"-+", "-", s2).strip('-')
+        return s2
+    convo_id = f"{_slug(domain)}.{_slug(behavior)}." + ",".join(f"{k}={v}" for k, v in axes.items()) + f".{_hash_id(domain+behavior+str(axes))}"
 
     # dataset conversation: only U1 and U2 (assistant turns generated at run-time)
     dataset_conv = {
@@ -74,8 +80,10 @@ def build_records(
         "constraints": {"respect_policy": True},
     }
 
+    # Ensure unique dataset_id per scenario to avoid overwrite collisions when saving multiple scenarios
+    scenario_hash = _hash_id(domain + behavior + str(axes))
     dataset_doc = {
-        "dataset_id": f"{domain}-{behavior}-v{version}",
+        "dataset_id": f"{_slug(domain)}-{_slug(behavior)}-v{version}-{scenario_hash}",
         "version": version,
         "metadata": {"domain": "commerce", "difficulty": "mixed", "tags": ["risk_weighted"]},
         "conversations": [dataset_conv],

@@ -11,10 +11,13 @@ def load_policy_text(domain: str, policies_dir: Path = Path("configs/policies"))
     fname = domain.replace("/", "_") + ".md"
     path = policies_dir / fname
     if not path.exists():
-        # try safe fallback: replace ampersand formatting
-        alt = domain.replace(" & ", " & ") + ".md"
+        # Try to match by normalized slug to tolerate separators and punctuation differences
+        import re
+        target = re.sub(r"[^a-z0-9]+", "-", domain.strip().lower()).strip('-')
         for p in policies_dir.glob("*.md"):
-            if p.stem.lower() == domain.lower() or p.name.lower() == fname.lower():
+            stem_slug = re.sub(r"[^a-z0-9]+", "-", p.stem.strip().lower()).strip('-')
+            name_slug = re.sub(r"[^a-z0-9]+", "-", p.name.replace('.md','').strip().lower()).strip('-')
+            if stem_slug == target or name_slug == target:
                 path = p
                 break
     if not path.exists():

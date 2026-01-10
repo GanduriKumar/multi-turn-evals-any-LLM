@@ -60,9 +60,21 @@ def build_context(domain: str, turns: List[Dict[str, str]], state: Dict[str, Any
         system_content = sp.content + f"\nSTATE={_render_state_summary(state)}"
         sys_params = dict(sp.params or {})
     else:
+        # Fallback prompt when dataset lacks policy/facts metadata.
+        # Still include explicit Output Requirements and FINAL_STATE instruction so
+        # downstream scoring can reliably extract the final outcome.
+        req = (
+            "Output Requirements:\n"
+            "- Ask clarifying questions when needed; do not resolve prematurely.\n"
+            "- For the final answer (A2), provide a policy-compliant, actionable resolution.\n"
+            "- Do not invent facts.\n"
+            "- At the very end of your final answer, append a single line with a JSON summary in this exact form: \n"
+            "  FINAL_STATE: {\"decision\": \"ALLOW|DENY|PARTIAL\", \"next_action\": <string or null>, \"refund_amount\": <number or null>, \"policy_flags\": [<strings>] }\n"
+            "  Only include this once and keep it on a single line.\n"
+        )
         system_content = (
-            f"You are an assistant for {domain}. "
-            f"Use the following current state to answer succinctly and accurately.\n"
+            f"You are an assistant for {domain}. Follow company policy while being helpful and concise.\n\n"
+            f"{req}\n"
             f"STATE={_render_state_summary(state)}"
         )
         sys_params = dict(DEFAULT_PARAMS)

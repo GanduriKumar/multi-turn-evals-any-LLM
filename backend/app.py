@@ -17,11 +17,23 @@ except ImportError:  # fallback for test runs importing as top-level modules
     from backend.orchestrator import Orchestrator
     from backend.artifacts import RunArtifactWriter, RunArtifactReader
     from backend.reporter import Reporter
+    from backend.commerce_taxonomy import load_commerce_config
     from backend.coverage_builder import (
         build_per_behavior_datasets,
         build_domain_combined_datasets,
         build_global_combined_dataset,
     )
+    # Prefer v2 coverage builders when available
+    try:
+        from backend.coverage_builder_v2 import (
+            build_per_behavior_datasets_v2,
+            build_domain_combined_datasets_v2,
+            build_global_combined_dataset_v2,
+        )
+    except Exception:  # pragma: no cover
+        build_per_behavior_datasets_v2 = None  # type: ignore
+        build_domain_combined_datasets_v2 = None  # type: ignore
+        build_global_combined_dataset_v2 = None  # type: ignore
     from backend.coverage_manifest import CoverageManifestor
 else:
     from .coverage_builder import (
@@ -29,12 +41,24 @@ else:
         build_domain_combined_datasets,
         build_global_combined_dataset,
     )
+    # Prefer v2 coverage builders when available
+    try:
+        from .coverage_builder_v2 import (
+            build_per_behavior_datasets_v2,
+            build_domain_combined_datasets_v2,
+            build_global_combined_dataset_v2,
+        )
+    except Exception:  # pragma: no cover
+        build_per_behavior_datasets_v2 = None  # type: ignore
+        build_domain_combined_datasets_v2 = None  # type: ignore
+        build_global_combined_dataset_v2 = None  # type: ignore
     from .coverage_manifest import CoverageManifestor
     from .coverage_reports import coverage_summary_csv, coverage_heatmap_csv, per_turn_csv
     from .coverage_config import CoverageConfig
     from .array_builder_v2 import build_combined_array
     from .array_builder_v2 import build_combined_array
     from .coverage_config import CoverageConfig
+    from .commerce_taxonomy import load_commerce_config
 
 APP_VERSION = "0.1.0-mvp"
 
@@ -377,8 +401,9 @@ async def embeddings_test():
         dim = len(vecs[0])
         return {"ok": True, "count": len(vecs), "dim": dim, "model": os.getenv("EMBED_MODEL", "nomic-embed-text"), "host": os.getenv("OLLAMA_HOST", "http://localhost:11434")}
     except Exception as e:
+        # Return plain text so UI doesn't try to parse JSON
         from fastapi import Response
-        raise HTTPException(status_code=500, detail=str(e))
+        return Response(content=f"Internal Server Error: {e}", media_type="text/plain", status_code=500)
 
 
 @app.get("/datasets")
@@ -547,8 +572,33 @@ class CoverageGenerateRequest(BaseModel):
 async def coverage_generate(req: CoverageGenerateRequest):
     # Build datasets/goldens per request
     try:
+        # Normalize empty lists to None (treat as 'all')
+        domains = req.domains if (isinstance(req.domains, list) and len(req.domains) > 0) else None
+        behaviors = req.behaviors if (isinstance(req.behaviors, list) and len(req.behaviors) > 0) else None
+        orig_domains = list(domains) if isinstance(domains, list) else None
+        orig_behaviors = list(behaviors) if isinstance(behaviors, list) else None
+        # Align to v2 taxonomy labels when possible (ensures filtering hits)
+        try:
+            cfg = load_commerce_config()
+            tax_domains = set(cfg["taxonomy"].get("domains", []))
+            tax_behaviors = set(cfg["taxonomy"].get("behaviors", []))
+            orig_dom_len = len(domains) if isinstance(domains, list) else 0
+            orig_beh_len = len(behaviors) if isinstance(behaviors, list) else 0
+            if domains is not None:
+                domains = [d for d in domains if d in tax_domains]
+                if orig_dom_len and len(domains) == 0:
+                    # If UI provided non-matching labels, surface a 400 to avoid generating ALL.
+                    unknown = [d for d in (orig_domains or []) if d not in tax_domains]
+                    raise HTTPException(status_code=400, detail=f"Unknown domain(s) for v2 taxonomy: {', '.join(unknown)}")
+            if behaviors is not None:
+                behaviors = [b for b in behaviors if b in tax_behaviors]
+                if orig_beh_len and len(behaviors) == 0:
+                    unknown = [b for b in (orig_behaviors or []) if b not in tax_behaviors]
+                    raise HTTPException(status_code=400, detail=f"Unknown behavior(s) for v2 taxonomy: {', '.join(unknown)}")
+        except Exception:
+            pass
         if req.as_array:
-            items, counts = build_combined_array(domains=req.domains, behaviors=req.behaviors, version=req.version)
+            items, counts = build_combined_array(domains=domains, behaviors=behaviors, version=req.version)
             if req.dry_run or not req.save:
                 return {"ok": True, "saved": False, "count": len(items), "counts_by_risk": counts}
             # Save array to datasets folder as a single file
@@ -567,17 +617,34 @@ async def coverage_generate(req: CoverageGenerateRequest):
             file_name = f"combined_array-{req.version}.json"
             p = arrays_dir / file_name
             if p.exists() and not req.overwrite:
-                from fastapi import HTTPException
                 raise HTTPException(status_code=409, detail=f"{file_name} exists; set overwrite=true")
             p.write_text(json.dumps(out, indent=2), encoding="utf-8")
             return {"ok": True, "saved": True, "file": str(p)}
         if req.combined:
-            # Build per-domain combined and a global combined
-            domain_outputs = build_domain_combined_datasets(domains=req.domains, behaviors=req.behaviors, version=req.version)
-            global_ds, global_gd = build_global_combined_dataset(domains=req.domains, behaviors=req.behaviors, version=req.version)
-            outputs = domain_outputs + [(global_ds, global_gd)]
+            # Build per-domain combined and a global combined (prefer v2 schema)
+            try:
+                domain_outputs = build_domain_combined_datasets_v2(domains=domains, behaviors=behaviors, version=req.version)
+                global_ds, global_gd = build_global_combined_dataset_v2(domains=domains, behaviors=behaviors, version=req.version)
+            except (NameError, TypeError, AttributeError):
+                domain_outputs = build_domain_combined_datasets(domains=domains, behaviors=behaviors, version=req.version)
+                global_ds, global_gd = build_global_combined_dataset(domains=domains, behaviors=behaviors, version=req.version)
+            # Filter out any empty datasets (no conversations) to avoid schema errors
+            outputs = [(ds, gd) for (ds, gd) in domain_outputs if (ds.get('conversations') or [])]
+            # Only include global combined when generating for ALL domains (no domain filter)
+            if domains is None and (global_ds.get('conversations') or []):
+                outputs.append((global_ds, global_gd))
+            # Fallback: if combined yielded nothing (e.g., over-filtered), build per-behavior instead
+            if not outputs:
+                try:
+                    outputs = build_per_behavior_datasets_v2(domains=domains, behaviors=behaviors, version=req.version)
+                except (NameError, TypeError, AttributeError):
+                    outputs = build_per_behavior_datasets(domains=domains, behaviors=behaviors, version=req.version)
         else:
-            outputs = build_per_behavior_datasets(domains=req.domains, behaviors=req.behaviors, version=req.version)
+            # Per-behavior datasets (prefer v2 schema)
+            try:
+                outputs = build_per_behavior_datasets_v2(domains=domains, behaviors=behaviors, version=req.version)
+            except (NameError, TypeError, AttributeError):
+                outputs = build_per_behavior_datasets(domains=domains, behaviors=behaviors, version=req.version)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"generation failed: {e}")
 
@@ -649,14 +716,29 @@ async def coverage_generate(req: CoverageGenerateRequest):
             # validate
             ds_errors = repo.sv.validate("dataset", ds)
             if ds_errors:
-                raise HTTPException(status_code=400, detail={"type": "dataset", "dataset_id": ds.get("dataset_id"), "errors": ds_errors})
+                raise HTTPException(
+                    status_code=400,
+                    detail=json.dumps({"type": "dataset", "dataset_id": ds.get("dataset_id"), "errors": ds_errors}),
+                )
             gt_errors = repo.sv.validate("golden", gd)
             if gt_errors:
-                raise HTTPException(status_code=400, detail={"type": "golden", "dataset_id": gd.get("dataset_id"), "errors": gt_errors})
+                raise HTTPException(
+                    status_code=400,
+                    detail=json.dumps({"type": "golden", "dataset_id": gd.get("dataset_id"), "errors": gt_errors}),
+                )
             dataset_id = ds["dataset_id"]
             ds_path, gt_path = build_paths(dataset_id, ds)
             if not req.overwrite and (ds_path.exists() or gt_path.exists()):
                 raise HTTPException(status_code=409, detail=f"{dataset_id} already exists; set overwrite=true")
+            # Ensure parent directories exist (defensive against misconfigured dataset_paths)
+            try:
+                ds_path.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+            try:
+                gt_path.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
             ds_path.write_text(json.dumps(ds, indent=2), encoding="utf-8")
             gt_path.write_text(json.dumps(gd, indent=2), encoding="utf-8")
             written.append({"dataset": ds_path.name, "golden": gt_path.name})
@@ -670,6 +752,19 @@ async def coverage_generate(req: CoverageGenerateRequest):
 async def coverage_taxonomy():
     cm = CoverageManifestor()
     return {"domains": cm.taxonomy.get("domains", []), "behaviors": cm.taxonomy.get("behaviors", [])}
+
+
+@app.get("/coverage/taxonomy_v2")
+async def coverage_taxonomy_v2():
+    try:
+        cfg = load_commerce_config()
+        tax = cfg.get("taxonomy", {})
+        return {
+            "domains": tax.get("domains", []),
+            "behaviors": tax.get("behaviors", []),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"failed to load v2 taxonomy: {e}")
 
 
 @app.get("/coverage/manifest")

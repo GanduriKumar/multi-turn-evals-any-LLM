@@ -45,6 +45,9 @@ def build_system_prompt(
         "- Ask clarifying questions when needed; do not resolve prematurely.\n"
         "- For the final answer (A2), provide a policy-compliant, actionable resolution.\n"
         "- Do not invent facts; rely only on Scenario Facts and the Safety/Policy excerpt.\n"
+        "- At the very end of your final answer, append a single line with a JSON summary in this exact form: \n"
+        "  FINAL_STATE: {\"decision\": \"ALLOW|DENY|PARTIAL\", \"next_action\": <string or null>, \"refund_amount\": <number or null>, \"policy_flags\": [<strings>] }\n"
+        "  Only include this once and keep it on a single line.\n"
     )
 
     axes_line = ", ".join(f"{k}={v}" for k, v in axes.items())

@@ -85,6 +85,15 @@ class TurnRunner:
         resp = await adapter.chat(req)
         ended_at = self._now_iso()
 
+        # Update state with assistant reply by re-running extractor over turns + model output.
+        # This captures the structured FINAL_STATE JSON (if present) or falls back to heuristics.
+        try:
+            assistant_msg = {"role": "assistant", "text": resp.content or ""}
+            updated_turns: List[Dict[str, str]] = list(turns) + [assistant_msg]
+            state = extract_state(domain, updated_turns, prev_state=state)
+        except Exception:
+            pass
+
         record: Dict[str, Any] = {
             "run_id": run_id,
             "provider": provider,
@@ -93,7 +102,7 @@ class TurnRunner:
             "turn_index": turn_index,
             "state": state,
             "context_audit": ctx.get("audit", {}),
-            "request": {"messages": messages},
+            "request": {"messages": messages, "params": params},
             "response": {
                 "ok": resp.ok,
                 "content": resp.content,

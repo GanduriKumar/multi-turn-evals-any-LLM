@@ -98,18 +98,24 @@ def build_domain_combined_datasets_v2(
     # Group per domain: aggregate conversations and goldens
     per = build_per_behavior_datasets_v2(domains=domains, behaviors=behaviors, version=version, seed=seed)
     by_domain: Dict[str, Tuple[Dict[str, Any], Dict[str, Any]]] = {}
+    import re
+    def _slug(s: str) -> str:
+        s2 = re.sub(r"[^A-Za-z0-9._-]+", "-", (s or "").strip().lower())
+        s2 = re.sub(r"-+", "-", s2).strip('-')
+        return s2
     for ds, gd in per:
         # each ds currently has one conversation; append into domain bucket
         meta = ds.get("conversations", [{}])[0].get("metadata", {})
         domain_label = meta.get("domain_label") or (ds.get("dataset_id", "").split("-")[0])
-        key = domain_label
+        key = _slug(domain_label)
         if key not in by_domain:
             by_domain[key] = ({
-                "dataset_id": f"coverage-{key.replace(' ', '-').lower()}-combined-{version}",
+                "dataset_id": f"coverage-{key}-combined-{version}",
                 "version": version,
-                "metadata": {"domain": "commerce", "difficulty": "mixed", "tags": ["combined", key]},
+                "metadata": {"domain": "commerce", "difficulty": "mixed", "tags": ["combined", domain_label]},
                 "conversations": [],
-            }, {"dataset_id": f"coverage-{key.replace(' ', '-').lower()}-combined-{version}", "version": version, "entries": []})
+            }, {"dataset_id": f"coverage-{key}-combined-{version}", "version": version, "entries": []})
+        # Merge conversations and golden entries
         by_domain[key][0]["conversations"].extend(ds.get("conversations", []))
         by_domain[key][1]["entries"].extend(gd.get("entries", []))
     return list(by_domain.values())

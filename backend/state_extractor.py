@@ -39,7 +39,14 @@ POLICY_FLAGS_PATTERNS = {
 }
 
 ACCOUNT_PAT = re.compile(r"\b(?:acct|account)\s*(?:id|number|#)?\s*[:#]?\s*([A-Z0-9-]{4,})\b", re.I)
-ORDER_PAT = re.compile(r"\b(?:order(?:\s*(?:id|number))?)\s*(?:is|:)?\s*([A-Z0-9-]{4,})\b|#([A-Z0-9-]{4,})\b", re.I)
+# Order ID must include at least one digit to avoid capturing words like "number".
+# Match either:
+#  - "order id|number is: XYZ-123" pattern, or
+#  - a leading hash followed by an id like "#XYZ-123"
+ORDER_PAT = re.compile(
+    r"(?:\border\s+(?:id|number)\s*(?:is|:)?\s*([A-Z0-9-]*\d[A-Z0-9-]*))|#([A-Z0-9-]*\d[A-Z0-9-]*)\b",
+    re.I,
+)
 AMOUNT_REFUND_PAT = re.compile(r"(?:refund(?: of)?|reimburse(?:ment)?(?: of)?)\s*\$?\s*([0-9]+(?:\.[0-9]{1,2})?)", re.I)
 AMOUNT_GENERAL_PAT = re.compile(r"\$\s*([0-9]+(?:\.[0-9]{1,2})?)\b")
 
@@ -107,6 +114,21 @@ def extract_state(domain: str, turns: List[Dict[str, str]], prev_state: Optional
     for t in turns:
         role = t.get("role", "").lower()
         text = t.get("text", "")
+        # Fast-path: parse structured FINAL_STATE JSON line if present at end of assistant reply
+        if role == "assistant":
+            try:
+                import json as _json
+                import re as _re
+                m = _re.search(r"FINAL_STATE\s*:\s*(\{.*\})\s*$", text, _re.I)
+                if m:
+                    js = m.group(1)
+                    obj = _json.loads(js)
+                    # Merge allowed keys
+                    for k in ("decision", "next_action", "refund_amount", "policy_flags"):
+                        if k in obj:
+                            state[k] = obj[k]
+            except Exception:
+                pass
         # intent primarily from user turns
         if role == "user":
             intent = _detect_intent(domain, text)

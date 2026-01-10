@@ -34,7 +34,9 @@ export default function CoverageGeneratorPage() {
 
   useEffect(() => {
     const load = async () => {
-      const r = await fetch('/coverage/taxonomy')
+      // Prefer v2 taxonomy for generation; fallback to legacy if unavailable
+      let r = await fetch('/coverage/taxonomy_v2')
+      if (!r.ok) r = await fetch('/coverage/taxonomy')
       const js = await r.json()
       setDomains(js.domains || [])
       setBehaviors(js.behaviors || [])
@@ -76,8 +78,10 @@ export default function CoverageGeneratorPage() {
         vertical,
       }
       const r = await fetch('/coverage/generate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      const js = await r.json()
-      if (!r.ok) throw new Error(js?.detail || 'Generation failed')
+      let js: any = null
+      const text = await r.text()
+      try { js = JSON.parse(text) } catch { /* not JSON */ }
+      if (!r.ok) throw new Error(js?.detail || text || 'Generation failed')
       if (js.saved) setMsg(`Saved ${js.files?.length || 0} dataset(s) to server (vertical: ${vertical})`)
       else setMsg(`Generated ${js.outputs?.length || 0} dataset(s) (dry run)`) 
     } catch (e:any) {
@@ -117,8 +121,10 @@ export default function CoverageGeneratorPage() {
       if (!match) throw new Error('Domain not found in taxonomy for dataset id.')
       const body = { combined: true, dry_run: false, save: true, overwrite: true, domains: [match], version: parsed.version, vertical }
       const r = await fetch('/coverage/generate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      const js = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(js?.detail || `Generate HTTP ${r.status}`)
+      const text = await r.text()
+      let js: any = null
+      try { js = JSON.parse(text) } catch {}
+      if (!r.ok) throw new Error(js?.detail || text || `Generate HTTP ${r.status}`)
       setRegenMsg('Regenerated with optimized coverage (pairwise). Files overwritten.')
     } catch (e:any) {
       setRegenMsg(e.message || 'Failed to regenerate')
